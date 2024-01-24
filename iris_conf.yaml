@@ -4,6 +4,6 @@ dest: adonninelli@195.14.102.215
 dest_path: /u/dssc/adonninelli/final/
 mirror: false
 pattern: '*'
-ignore_pattern: '.git/ *.pdf'
+ignore_pattern: '.git/ *.pdf *.csv'
 origin_jump: null
 dest_jump: null

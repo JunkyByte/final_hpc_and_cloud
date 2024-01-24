@@ -71,7 +71,7 @@ I notice that  the times are a bit inconsistent (1 node 128 cores). I'm requesti
 ```bash
 # Running with higher warmup and higher number of repetitions is more consistent but requires more time.
 # defaults were -x 200 (warmup) and -i 10000 (iterations)
-mpirun ./c/mpi/collective/blocking/osu_bcast -x 1000 -i 100000
+mpirun ./c/mpi/collective/blocking/osu_bcast -x 1000 -i 25000
 # Using exclusive seems to give a bit better results.
 # just add --exclusive to salloc
 ```
@@ -127,8 +127,7 @@ mpirun -np 64 -H node1:32,node2:32 ./your_mpi_program
 ```
 
 (Took inspiration by [orfeo intel benchmark](https://orfeo-doc.areasciencepark.it/examples/MPI-communication/#more-on-node-mapping))
-I tried to reduce the latency by binding on the same numa region (the 96-111 cores) also choosing the closest one to the infiniband card. I did not obtain better results (with large messages I got worse results). Still running the latency test they have a lower latency.
-I guess that during a broadcast operation other factors influence the latency, especially with a large number of processors.
+I tried to reduce the latency by binding on the same numa region also choosing the closest one to the infiniband card (the 96-111 cores). The latency between 2 processors is lower but as soon as the message size becomes more consistent it obviously does not make much of a difference. Testing this with a larger amount of processors increases the latency, even with small message sizes. I guess that during a broadcast operation other factors influence the latency, especially with a large number of processors and distributing the processors in a more even manner among the nodes reduces overall latency. The algorithm used by the broadcast operation can influence this as well.
 
 Notice that with 2 processors the latency (reported for small message sizes) is lower when binding to these cores
 
@@ -172,3 +171,113 @@ $ mpirun --report-bindings -H epyc002:1,epyc001:1 ./c/mpi/collective/blocking/os
 ```
 
 Therefore I won't write a custom rankfile for the benchmark but only use the `map-by` checking for lowest latency achievable.
+The algorithm used by the osu_bcast can lead to different performances wrt the map-by, therefore an optimal solution for all algorithms to test might not exist.
+
+To show this I experiment as follows:
+
+I experiment the usage of (2) chain algorithm for broadcast vs 2 different map-by policies. There's a huge difference in performance using map-by socket vs core.
+This makes sense as using map-by socket and a chain algorithm subsequent processors that must communicate are always far away from each other
+
+Chain tree reference
+> Chain tree algorithm. Each internal node in the topology has one child (see Fig. 3b). The message is split into segments and transmission of segments continues in a pipeline until the last node gets the broadcast message. ith process receives the message from the (i − 1)th process, and sends it to (i + 1)th process.
+
+```bash
+# Map by socket using chain algorithm
+$ mpirun --mca coll_tuned_use_dynamic_rules true --mca coll_tuned_bcast_algorithm 2 -H epyc002:128,epyc003:128 --map-by socket ./c/mpi/collective/blocking/osu_bcast -x 3000 -i 100000 -m 8192
+
+# OSU MPI Broadcast Latency Test v7.3
+# Datatype: MPI_CHAR.
+# Size       Avg Latency(us)
+1                      32.10
+2                      27.03
+4                      18.58
+8                      16.20
+16                     16.46
+32                     20.17
+64                     19.58
+128                    24.74
+256                    26.94
+512                    33.17
+1024                   41.64
+2048                   64.22
+4096                  104.90
+8192                  190.94
+
+# Map by core using chain algorithm
+$ mpirun --mca coll_tuned_use_dynamic_rules true --mca coll_tuned_bcast_algorithm 2 -H epyc002:128,epyc003:128 --map-by core ./c/mpi/collective/blocking/osu_bcast -x 3000 -i 100000 -m 8192
+
+# OSU MPI Broadcast Latency Test v7.3
+# Datatype: MPI_CHAR.
+# Size       Avg Latency(us)
+1                       7.77
+2                       7.56
+4                       7.78
+8                       7.68
+16                      7.49
+32                      7.92
+64                      7.93
+128                     9.56
+256                     9.45
+512                    10.56
+1024                   11.06
+2048                   14.49
+4096                   18.56
+8192                   28.08
+```
+
+Notice how the same experiment using a more complex algorithm such as (5) binary tree has a different behaviour, with better performances using map-by core but with a much smaller effect (~2x vs ~4x difference).
+```bash
+# Map by socket using binary tree algorithm
+$ mpirun --mca coll_tuned_use_dynamic_rules true --mca coll_tuned_bcast_algorithm 5 -H epyc002:128,epyc003:128 --map-by socket ./c/mpi/collective/blocking/osu_bcast -x 3000 -i 100000 -m 8192
+
+# OSU MPI Broadcast Latency Test v7.3
+# Datatype: MPI_CHAR.
+# Size       Avg Latency(us)
+1                       6.70
+2                       6.29
+4                       6.47
+8                       4.82
+16                      6.41
+32                      4.31
+64                      7.32
+128                     8.29
+256                     6.68
+512                     8.05
+1024                    8.22
+2048                   17.95
+4096                   20.29
+8192                   29.98
+
+# Map by core using binary tree algorithm
+$ mpirun --mca coll_tuned_use_dynamic_rules true --mca coll_tuned_bcast_algorithm 5 -H epyc002:128,epyc003:128 --map-by core ./c/mpi/collective/blocking/osu_bcast -x 3000 -i 100000 -m 8192
+
+# OSU MPI Broadcast Latency Test v7.3
+# Datatype: MPI_CHAR.
+# Size       Avg Latency(us)
+1                       3.67
+2                       3.79
+4                       3.77
+8                       3.77
+16                      3.92
+32                      4.17
+64                      4.21
+128                     6.08
+256                     6.60
+512                     6.98
+1024                    7.20
+2048                   10.07
+4096                   18.89
+8192                   35.40
+```
+
+I picked these 3 algorithms for testing broadcast:  
+and I compare them with default implementation (which *tries* to use the most convenient one)
+- (2) chain
+- (5) binary tree
+- (3) pipeline
+
+I pick the `scatter` as the second operation for the exercise.
+For scatter we do not have much choice in algorithms and we compare the default with:
+- (1) basic linear
+- (2) binomial
+- (3) non-blocking linear
