@@ -1,4 +1,5 @@
 import os
+import time
 import subprocess
 import pandas as pd
 from subprocess import PIPE
@@ -10,21 +11,17 @@ BUILD_DIRECTORY = "./osu-micro-benchmarks-7.3/build/"
 BROADCAST_PATH = os.path.join(BUILD_DIRECTORY, "c/mpi/collective/blocking/osu_bcast")
 SCATTER_PATH = os.path.join(BUILD_DIRECTORY, "c/mpi/collective/blocking/osu_scatter")
 
-# Common number of iterations
-WARMUP_ITERATIONS = 1000
-ITERATIONS = 40000
-
 # Broadcast params
-WARMUP_ITERATIONS_BCAST = WARMUP_ITERATIONS
-ITERATIONS_BCAST = ITERATIONS
+WARMUP_ITERATIONS_BCAST = 1000
+ITERATIONS_BCAST = 30000
 BROADCAST_COMMAND = f'{BROADCAST_PATH} -x {WARMUP_ITERATIONS_BCAST} -i {ITERATIONS_BCAST} -f'
 BROADCAST_ALGO = '--mca coll_tuned_use_dynamic_rules true --mca coll_tuned_bcast_algorithm {0}'  # Note these must be appended to mpirun
 BROADCAST_ALGO_CODES = [0, 2, 3, 5]
 BROADCAST_ALGO_NAMES = {0: 'default', 2: 'chain', 5: 'binary tree', 3: 'pipeline'}
 
 # Scatter params
-WARMUP_ITERATIONS_SCATTER = WARMUP_ITERATIONS
-ITERATIONS_SCATTER = ITERATIONS
+WARMUP_ITERATIONS_SCATTER = 1000
+ITERATIONS_SCATTER = 25000
 SCATTER_COMMAND = f'{SCATTER_PATH} -x {WARMUP_ITERATIONS_SCATTER} -i {ITERATIONS_SCATTER} -f'
 SCATTER_ALGO = '--mca coll_tuned_use_dynamic_rules true --mca coll_tuned_scatter_algorithm {0}'  # Note these must be appended to mpirun
 SCATTER_ALGO_CODES = [0, 1, 2, 3]
@@ -52,9 +49,10 @@ def run_experiment(COMMAND, ALGOS_COMMAND, ALGOS, ALGOS_NAME, NPS, OP_NAME=None)
         ALGO_NAME = ALGOS_NAME[ALGO]
         for NP in NPS:
             k += 1
+            t_start = time.time()
             print(f'>>> {k}/{tot} Running {OP_NAME} with {NP} total processes', flush=True)
             ret = mpirun_caller(COMMAND, ALGO_COMMAND, nodes, NP)
-            print(f'>>> Command succeeded: {ret.returncode == 0}', flush=True)
+            print(f'>>> Command succeeded: {ret.returncode == 0} in {(time.time() - t_start):,.2f}s', flush=True)
             assert ret.returncode == 0
 
             output = ret.stdout.decode()
