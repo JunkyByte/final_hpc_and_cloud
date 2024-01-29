@@ -28,6 +28,6 @@ python_script="./runner.py"
 
 # Run the Python script with sbatch
 echo ">>> Running python script"
-python $python_script $1
+python $python_script $1 $2
 
 date

@@ -5,7 +5,7 @@
 int ROOT_ID = 0;
 
 // Number of repetitions for each simulation
-int REPETITIONS = 100000;
+int REPETITIONS = 100;
 
 // Number of elements to be sent by each process
 // int is 4 bytes so 4 * send_count data for each process

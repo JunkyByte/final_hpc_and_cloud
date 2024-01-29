@@ -35,19 +35,20 @@ int main(int argc, char** argv) {
     }
     // ************************************
 
-    MPI_Status status;
-
     // Timing variables
     double start_time, end_time, delta;
 
     // The implementation
     for (int k=0; k<REPETITIONS; k++){
-        // Naive approach with blocking calls as baseline
+        // Naive approach with parallel recv calls
         // Each process but root call a send passing its rank as tag
         // The rank is used only to receive the data in order
 
         // *** SETUP
         int* curr_buffer = recv_buffer;
+
+        // Create a vector of MPI_Requests to hold requests.
+        MPI_Request reqs[size];
 
         // Start the timer
         start_time = MPI_Wtime();
@@ -55,11 +56,16 @@ int main(int argc, char** argv) {
         if (rank != 0){
             MPI_Send(send_data, SEND_COUNT, MPI_INT, ROOT_ID, rank, MPI_COMM_WORLD);
         } else {
-            // Root calls one recv for each send
+
+            // Issue Irecv
             for (int i=1; i<size; i++){
                 curr_buffer += SEND_COUNT;  // Move buffer pointer along
-                MPI_Recv(curr_buffer, SEND_COUNT, MPI_INT, MPI_ANY_SOURCE, i, MPI_COMM_WORLD, &status);
+                MPI_Irecv(curr_buffer, SEND_COUNT, MPI_INT, MPI_ANY_SOURCE, i, MPI_COMM_WORLD, &reqs[i]);
             }
+
+            // Wait all requests to be done
+            for (int i=1; i<size; i++)
+                MPI_Wait(&reqs[i], MPI_STATUS_IGNORE);  // I do not need to get the status
         }
 
         end_time = MPI_Wtime();
