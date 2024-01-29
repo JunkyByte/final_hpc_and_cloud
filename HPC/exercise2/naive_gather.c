@@ -1,15 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
-
-int ROOT_ID = 0;
-
-// Number of repetitions for each simulation
-int REPETITIONS = 100;
-
-// Number of elements to be sent by each process
-// int is 4 bytes so 4 * send_count data for each process
-int SEND_COUNT = 32768;
+#include "const.h"
 
 
 int main(int argc, char** argv) {
@@ -22,11 +14,24 @@ int main(int argc, char** argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
 
+    const int dummy_size = 100;  // Size of the dummy data
+    char dummy_data[dummy_size];
+
+    // Warm-up phase
+    for (int i = 0; i < 10; i++) {
+        // Use MPI_Send/MPI_Recv with dummy data
+        MPI_Send(dummy_data, dummy_size, MPI_CHAR, (rank + 1) % size, 0, MPI_COMM_WORLD);
+        MPI_Recv(dummy_data, dummy_size, MPI_CHAR, (rank + size - 1) % size, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
+
+
     // The root process gathers data from all other processes
     int* recv_buffer = NULL;
     if (rank == 0) {
         // Allocate memory for the gathered data at the root
         recv_buffer = (int*)malloc(size * SEND_COUNT * sizeof(int));
+        for (int k=0;k<SEND_COUNT;k++)
+            recv_buffer[k] = 0;
     }
 
     int send_data[SEND_COUNT];
@@ -41,30 +46,30 @@ int main(int argc, char** argv) {
     double start_time, end_time, delta;
 
     // The implementation
-    for (int k=0; k<REPETITIONS; k++){
-        // Naive approach with blocking calls as baseline
-        // Each process but root call a send passing its rank as tag
-        // The rank is used only to receive the data in order
+    // Naive approach with blocking calls as baseline
+    // Each process but root call a send passing its rank as tag
+    // The rank is used only to receive the data in order
 
-        // *** SETUP
-        int* curr_buffer = recv_buffer;
+    // *** SETUP
+    int* curr_buffer = recv_buffer;
+    // MPI_Gather(send_data, SEND_COUNT, MPI_INT, recv_buffer, SEND_COUNT, MPI_INT, 0, MPI_COMM_WORLD);
 
-        // Start the timer
-        start_time = MPI_Wtime();
+    // Start the timer
+    start_time = MPI_Wtime();
 
-        if (rank != 0){
-            MPI_Send(send_data, SEND_COUNT, MPI_INT, ROOT_ID, rank, MPI_COMM_WORLD);
-        } else {
-            // Root calls one recv for each send
-            for (int i=1; i<size; i++){
-                curr_buffer += SEND_COUNT;  // Move buffer pointer along
-                MPI_Recv(curr_buffer, SEND_COUNT, MPI_INT, MPI_ANY_SOURCE, i, MPI_COMM_WORLD, &status);
-            }
+    if (rank != 0){
+        MPI_Send(send_data, SEND_COUNT, MPI_INT, 0, rank, MPI_COMM_WORLD);
+    } else {
+        // Root calls one recv for each send
+        for (int i=1; i<size; i++){
+            curr_buffer += SEND_COUNT;  // Move buffer pointer along
+            MPI_Recv(curr_buffer, SEND_COUNT, MPI_INT, MPI_ANY_SOURCE, i, MPI_COMM_WORLD, &status);
         }
-
-        end_time = MPI_Wtime();
-        delta += end_time - start_time;
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    end_time = MPI_Wtime();
+    delta = end_time - start_time;
 
     // TODO: Write test code that verifies gather is correct
     // if (rank == 0) {
@@ -78,7 +83,7 @@ int main(int argc, char** argv) {
     // free and print the time taken by the communication
     if (rank == 0) {
         free(recv_buffer);
-        printf("Time taken by naive_gather: %f seconds\n", delta); // / REPETITIONS);
+        printf("%f\n", delta); // / REPETITIONS);
     }
 
     MPI_Finalize();

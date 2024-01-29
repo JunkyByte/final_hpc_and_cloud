@@ -20,3 +20,14 @@ I start by implementing a Naive strategy to assess an initial baseline using p2p
 
 ### naive_gather_improved.c
 I try to build on top of this naive approach with a very similar one in which the recv are all issued together in a non-blocking fashion, then root waits for all communications to be done and proceeds.
+
+### gather_ring.c
+I create a ring communication in which each process sends
+it's data to the left process until root receives all data.
+this increases the number of communications but reduces the
+each communication data size.
+Note that the Recv are done in a blocking way and we wait for previous one
+to be done.
+
+### gather_ring_all_parallel.c
+At cost of memory I parallelize all the communications of gather_ring version.

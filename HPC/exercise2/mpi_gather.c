@@ -1,15 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
+#include "const.h"
 
 int ROOT_ID = 0;
-
-// Number of repetitions for each simulation
-int REPETITIONS = 100;
-
-// Number of elements to be sent by each process
-// int is 4 bytes so 4 * send_count data for each process
-int SEND_COUNT = 32768;
 
 
 int main(int argc, char** argv) {
@@ -22,11 +16,24 @@ int main(int argc, char** argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
 
+    const int dummy_size = 100;  // Size of the dummy data
+    char dummy_data[dummy_size];
+
+    // Warm-up phase
+    for (int i = 0; i < 10; i++) {
+        // Use MPI_Send/MPI_Recv with dummy data
+        MPI_Send(dummy_data, dummy_size, MPI_CHAR, (rank + 1) % size, 0, MPI_COMM_WORLD);
+        MPI_Recv(dummy_data, dummy_size, MPI_CHAR, (rank + size - 1) % size, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
+
+
     // The root process gathers data from all other processes
     int* recv_buffer = NULL;
-    if (rank == 0) {
+    if (rank == ROOT_ID) {
         // Allocate memory for the gathered data at the root
         recv_buffer = (int*)malloc(size * SEND_COUNT * sizeof(int));
+        for (int k=0;k<SEND_COUNT;k++)
+            recv_buffer[k] = ROOT_ID;
     }
 
     int send_data[SEND_COUNT];
@@ -37,15 +44,15 @@ int main(int argc, char** argv) {
 
     // Timing variables
     double start_time, end_time, delta;
+    MPI_Request req;
 
-    // The implementation
-    for (int i=0; i<REPETITIONS; i++){
-        // Start the timer
-        start_time = MPI_Wtime();
-        MPI_Gather(send_data, SEND_COUNT, MPI_INT, recv_buffer, SEND_COUNT, MPI_INT, ROOT_ID, MPI_COMM_WORLD);
-        end_time = MPI_Wtime();
-        delta += end_time - start_time;
-    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    // Start the timer
+    start_time = MPI_Wtime();
+    MPI_Gather(send_data, SEND_COUNT, MPI_INT, recv_buffer, SEND_COUNT, MPI_INT, ROOT_ID, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
+    end_time = MPI_Wtime();
+    delta = end_time - start_time;
 
     // TODO: Write test code that verifies gather is correct
     // if (rank == 0) {
@@ -58,8 +65,8 @@ int main(int argc, char** argv) {
     // }
 
     // Print the time taken by the communication
-    if (rank == 0) {
-        printf("Time taken by MPI_Gather: %f seconds\n", delta); // / REPETITIONS);
+    if (rank == ROOT_ID) {
+        printf("%f\n", delta); // / REPETITIONS);
     }
 
     MPI_Finalize();
