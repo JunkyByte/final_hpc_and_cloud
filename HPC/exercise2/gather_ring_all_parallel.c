@@ -30,8 +30,12 @@ int main(int argc, char** argv) {
     if (rank == 0) {
         // Allocate memory for the gathered data at the root
         recv_buffer = (int*)malloc(size * SEND_COUNT * sizeof(int));
-        for (int k=0;k<SEND_COUNT;k++)
-            recv_buffer[k] = 0;
+        for (int k=0;k<SEND_COUNT;k++){
+            if (SEND_COUNT < 128) // I use this for debugging
+                recv_buffer[k] = k;
+            else
+                recv_buffer[k] = 0;
+        }
     } else {
         // All ranks need a buffer where they can store size - rank - 1 messages
         recv_buffer = (int*)malloc((size - rank - 1) * SEND_COUNT * sizeof(int));
@@ -39,7 +43,10 @@ int main(int argc, char** argv) {
 
     int send_data[SEND_COUNT];
     for (int i=0; i<SEND_COUNT; i++){
-        send_data[i] = rank;
+        if (SEND_COUNT < 128) // I use this for debugging
+            send_data[i] = rank * SEND_COUNT + i;
+        else
+            send_data[i] = rank;
     }
     // ************************************
 
@@ -64,9 +71,8 @@ int main(int argc, char** argv) {
 
     int count_done = 0;
     int done[size-rank-1];
-    int sent[size-rank-1];
     for (int i=0;i<size-rank-1;i++){
-        sent[i] = 0;
+        done[i] = 0;
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -90,9 +96,8 @@ int main(int argc, char** argv) {
         // we test the reqs to be sure it is
         while (1){
             for (int i=0; i<size-rank-1; i++){
-                if (sent[i]){
+                if (done[i])
                     continue;
-                }
 
                 MPI_Test(&reqs[i], &done[i], MPI_STATUS_IGNORE);  // I do not need to get the status
                 if (done[i]){
@@ -100,13 +105,11 @@ int main(int argc, char** argv) {
                     // printf("I am %d and I received my %d data, I can now issue a send!\n", rank, i + 1);
                     MPI_Isend(recv_buffer + i * SEND_COUNT, SEND_COUNT, MPI_INT, rank - 1, i + 1, MPI_COMM_WORLD, &reqs_send[i + 1]);
                     ++count_done;
-                    sent[i] = 1;
                 }
             }
 
-            if (count_done == size - rank - 1){
+            if (count_done == size - rank - 1)
                 break;
-            }
         }
         // printf("I am %d and I issued all my sends!\n", rank);
     } else {

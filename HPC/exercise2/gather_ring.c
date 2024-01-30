@@ -30,8 +30,12 @@ int main(int argc, char** argv) {
     if (rank == 0) {
         // Allocate memory for the gathered data at the root
         recv_buffer = (int*)malloc(size * SEND_COUNT * sizeof(int));
-        for (int k=0;k<SEND_COUNT;k++)
-            recv_buffer[k] = 0;
+        for (int k=0;k<SEND_COUNT;k++){
+            if (SEND_COUNT < 128) // I use this for debugging
+                recv_buffer[k] = k;
+            else
+                recv_buffer[k] = 0;
+        }
     } else {
         // All ranks need a buffer where they can store rank + 1 message
         recv_buffer = (int*)malloc(SEND_COUNT * sizeof(int));
@@ -39,7 +43,10 @@ int main(int argc, char** argv) {
 
     int send_data[SEND_COUNT];
     for (int i=0; i<SEND_COUNT; i++){
-        send_data[i] = rank;
+        if (SEND_COUNT < 128) // I use this for debugging
+            send_data[i] = rank * SEND_COUNT + i;
+        else
+            send_data[i] = rank;
     }
     // ************************************
 
@@ -102,13 +109,13 @@ int main(int argc, char** argv) {
     delta = end_time - start_time;
 
     // TODO: Write test code that verifies gather is correct
-    // if (rank == 0) {
-    //      printf("Gathered data at the root process:\n");
-    //      for (int i = 0; i < size * SEND_COUNT; ++i) {
-    //          printf("%d ", recv_buffer[i]);
-    //      }
-    //      printf("\n");
-    // }
+    //if (rank == 0) {
+    //     printf("Gathered data at the root process:\n");
+    //     for (int i = 0; i < size * SEND_COUNT; ++i) {
+    //         printf("%d ", recv_buffer[i]);
+    //     }
+    //     printf("\n");
+    //}
 
     // free and print the time taken by the communication
     free(recv_buffer);

@@ -18,9 +18,9 @@ for script in "${script_names[@]}"
 do
     # Compile the C script with conditional flags
     if [ -n "$1" ]; then
-        mpirun -np 1 mpicc -march=native -O3 -D SEND_COUNT="$1" "$script" -o "./build/out_${script%.c}"
+        mpirun -np 1 mpicc -march=native -lm -O3 -D SEND_COUNT="$1" "$script" -o "./build/out_${script%.c}"
     else
-        mpirun -np 1 mpicc -march=native -O3 "$script" -o "./build/out_${script%.c}"
+        mpirun -np 1 mpicc -march=native -lm -O3 "$script" -o "./build/out_${script%.c}"
     fi
 done
 

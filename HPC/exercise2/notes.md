@@ -30,4 +30,7 @@ Note that the Recv are done in a blocking way and we wait for previous one
 to be done.
 
 ### gather_ring_all_parallel.c
-At cost of memory I parallelize all the communications of gather_ring version.
+At cost of memory I parallelize all the communications of gather_ring version. The implementation becomes quite more complex.
+
+### gather_binary_tree.c
+The set of processes is conceptualized as a binary tree, where each process serves as a node. Beginning with the leaf nodes, each process shares its data with its parent, and this process continues until the root node is reached. As data moves up the tree, each node accumulates information from its children until the root receives the complete set of data from all processes.

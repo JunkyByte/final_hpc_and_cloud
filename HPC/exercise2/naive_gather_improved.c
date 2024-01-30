@@ -30,13 +30,20 @@ int main(int argc, char** argv) {
     if (rank == 0) {
         // Allocate memory for the gathered data at the root
         recv_buffer = (int*)malloc(size * SEND_COUNT * sizeof(int));
-        for (int k=0;k<SEND_COUNT;k++)
-            recv_buffer[k] = 0;
+        for (int k=0;k<SEND_COUNT;k++){
+            if (SEND_COUNT < 128) // I use this for debugging
+                recv_buffer[k] = k;
+            else
+                recv_buffer[k] = 0;
+        }
     }
 
     int send_data[SEND_COUNT];
     for (int i=0; i<SEND_COUNT; i++){
-        send_data[i] = rank;
+        if (SEND_COUNT < 128) // I use this for debugging
+            send_data[i] = rank * SEND_COUNT + i;
+        else
+            send_data[i] = rank;
     }
     // ************************************
 
