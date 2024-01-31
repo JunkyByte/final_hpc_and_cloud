@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
 
-    const int dummy_size = 100;  // Size of the dummy data
+    const int dummy_size = 10;  // Size of the dummy data
     char dummy_data[dummy_size];
 
     // Warm-up phase

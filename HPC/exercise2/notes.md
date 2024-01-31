@@ -34,3 +34,22 @@ At cost of memory I parallelize all the communications of gather_ring version. T
 
 ### gather_binary_tree.c
 The set of processes is conceptualized as a binary tree, where each process serves as a node. Beginning with the leaf nodes, each process shares its data with its parent, and this process continues until the root node is reached. As data moves up the tree, each node accumulates information from its children until the root receives the complete set of data from all processes.
+
+
+## Scaling
+
+TODO MAPPING EQUALLY BETWEEN NODES OR WHATEVER
+
+TODO
+
+With a gather operation I am a bit confused on how to assess scaling.
+
+> Definition: Weak scaling measures how well a parallel algorithm performs as the problem size per processor or per core remains constant, but the overall problem size increases as more processors are added.
+
+I assess weak scaling by having a certain amount of total data that must be gathered and changing the number of processes that share chunks of it.
+Therefore if NP is number of processes
+`data_size_per_process = max_data_size / NP` is the amount of data per process.
+
+In strong scaling the amount of work should remain the same.
+
+Definition: Strong scaling measures how well a parallel algorithm performs as the problem size remains constant, but the number of processors is varied.

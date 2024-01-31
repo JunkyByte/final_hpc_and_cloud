@@ -1,17 +1,11 @@
 #!/bin/bash
 
-script_names=("mpi_gather.c" "naive_gather.c" "naive_gather_improved.c" "gather_ring.c" "gather_ring_all_parallel.c")
-num_processes=36
+script_names=("mpi_gather.c" "naive_gather.c" "naive_gather_improved.c" "gather_ring.c" "gather_ring_all_parallel.c" "gather_binary_tree.c")
+num_processes=32
 num_repetitions=1
 
 # Get the SEND_COUNT value
 SEND_COUNT="$1"
-
-# Create a CSV file for storing results with SEND_COUNT in the name
-csv_file="timing_results_${SEND_COUNT}.csv"
-
-# Print CSV header
-echo "Algorithm,Time" > "$csv_file"
 
 # Compile
 for script in "${script_names[@]}"
@@ -34,8 +28,5 @@ do
 
         # Print the timing information with alignment
         printf "Run %d - Timing for %-30s: %s\n" "$i" "$script" "$timing"
-
-        # Extract the timing value and append to the CSV file
-        echo "${script%.c},$timing" >> "$csv_file"
     done
 done
