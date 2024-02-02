@@ -108,7 +108,7 @@ if __name__ == '__main__':
     if bench_type == 'full':
         NPS = [2, 4, 8, 16, 32, 64, 128, 256]
     elif bench_type == 'fixedsize':
-        NPS = [2 * (i + 1) for i in range(128)][::4]
+        NPS = [2 * (i + 1) for i in range(128)]
         SCATTER_COMMAND = SCATTER_COMMAND.replace(f'-m {MAX_SIZE}', f'-m {FIXED_SIZE}:{FIXED_SIZE}')
         BROADCAST_COMMAND = BROADCAST_COMMAND.replace(f'-m {MAX_SIZE}', f'-m {FIXED_SIZE}:{FIXED_SIZE}')
         # SCATTER_COMMAND = SCATTER_COMMAND.replace(f'-i {ITERATIONS_SCATTER}', '-i 50000')
