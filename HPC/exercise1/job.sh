@@ -26,7 +26,6 @@ pip install pandas --user
 # Set the path to the Python script
 python_script="./runner.py"
 
-# Run the Python script with sbatch
 echo ">>> Running python script"
 python $python_script $1 $2
 
