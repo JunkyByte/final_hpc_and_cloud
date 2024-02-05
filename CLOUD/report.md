@@ -1,16 +1,16 @@
-# Cloud-Based File Storage System Project Report
-
-![nextcloud_system_design](https://github.com/JunkyByte/final_hpc_and_cloud/assets/24314647/55386fdb-6b40-4dde-a5c4-9e1a722dc47d)
+# Cloud-Based File Storage System
+# Project Report - Cloud
+- Adriano Donninelli adonnine@sissa.it
 
 ## Introduction
 
 This project aims to address the need for a cloud-based file storage system that enables users to seamlessly upload, download, and delete files while ensuring the privacy of individual storage spaces. In order to not reinvent the wheel and to pursue efficiency, Nextcloud has been selected for its robust features and ease of deployment using Docker containers.
 
-### Choice of Nextcloud
+![nextcloud_system_design](https://i.imgur.com/68Ic2Iv.png)
+
+## Nextcloud and its features
 
 Nextcloud stands out as a suitable choice for this project due to its comprehensive set of functionalities tailored for file management in a cloud environment. It provides a user-friendly interface, robust security measures, and the ability to scale seamlessly. Moreover, the availability of a Docker container for Nextcloud simplifies the deployment process, ensuring a quick and straightforward implementation.
-
-## Nextcloud features
 
 ### User Authentication and Authorization with Nextcloud
 
@@ -53,7 +53,7 @@ During development I opted for a simple sqlite database backend for Nextcloud me
 
 ### Storage solutions
 
-By default Nextcloud stores files in the local file system, which is convenient for a small deployment. In more complex environments it offers flexible solutions for both Object based storage like Amazon S3 and network distributed file systems like NFS. I will discuss in the scaling section the most convenient solution based on our requirements.
+By default Nextcloud stores files in the local file system, which is convenient for a small deployment. In more complex environments it offers flexible solutions for both Object based storage like Amazon S3 and network distributed file systems like NFS. I will discuss in the scaling section the most convenient solution based on possible requirements.
 
 ### Monitoring
 
@@ -95,15 +95,15 @@ sh delete_data_test_users.sh
 I attach two charts of the results, where the run is performed on my laptop which is M2 Macbook Air, note that encryption is enabled during these tests. The tests spawn up to 10 and 20 concurrent users. As we can see my laptop is able to handle 10 users without any failure but starts to struggle and fail requests when we increase to 20.
 
 > 10 user:
-![locust_10user](https://github.com/JunkyByte/final_hpc_and_cloud/assets/24314647/32ea805f-eed5-44ed-adef-d00aa7dbad7c)
+![locust_10user](https://i.imgur.com/Xkydm3N.png)
 
 > 20 user
-![locust_20user](https://github.com/JunkyByte/final_hpc_and_cloud/assets/24314647/0afd4812-9fbc-40b8-b482-c274944461cd)
+![locust_20user](https://i.imgur.com/XKkKB7X.png)
 
 Analyzing the locust report with 20 concurrent users reveals server issues, particularly in serving requests. Simple PUT requests experience delays of up to 5 seconds. To pinpoint the problem, additional tests are needed to determine if it's related to CPU or IO constraints.
 
 ```
-Method  Name	                                                Average   Min     Max (ms)
+Method  Name	                                                  Min     Max (ms)
 PUT	/remote.php/dav/files/locust_user0/test_locust_file.txt	407	  35	  4537
 [...]
 ```
@@ -169,3 +169,17 @@ Comparing the two solutions, on-premise deployment (Solution 1) may incur in hig
 In order to optimize the costs for Solution 2, assuming the data stored is not sensible or that the cloud service provides additional layers of security one could disable server wise encryption, leading to smaller file sizes and better performances. This might also apply to Solution 1 in case we have limited amount of computing power or storage memory.
 
 As this type of deployment is probably long term the usage of Reserved instances which many cloud providers offer can reduce costs considerably.
+
+## Conclusion
+
+In conclusion, in this project we explored the possible implementation of a cloud-based file storage system using Nextcloud, which offers a robust set of features that align well with the project requirements. Leveraging Nextcloud's user-friendly interface, scalable architecture, and Docker container deployment significantly simplifies the development and deployment process.
+
+The chosen features of Nextcloud, such as user authentication, role-based access control, private storage allocation, and admin management capabilities, provide a solid foundation for building a secure and user-centric file storage platform. The incorporation of security measures, including server-side file encryption and multi-factor authentication, ensures the protection of sensitive user data.
+
+Nextcloud's flexibility in supporting various database backends and storage solutions enables adaptation to diverse deployment scenarios. The choice of on-premise deployment with a shared cluster or a cloud provider solution with autoscaling capabilities offers different possible production solution to different organizations and requirements.
+
+This report discusses solutions for monitor and test based analysis of the deployed system, allowing to better understand the behaviour and resources requirements of the platform.
+
+In the realm of scalability, this report presents two possible solutions, exploring advantages and costs. The on-premise cluster deployment offers control and potentially lower operational costs, while the cloud provider deployment leverages scalability features, enhancing flexibility but with potential usage-based cost implications.
+
+This project underscores the importance of intelligent decision-making in balancing features, security, scalability, and cost-effectiveness to achieve a comprehensive and efficient solution.
