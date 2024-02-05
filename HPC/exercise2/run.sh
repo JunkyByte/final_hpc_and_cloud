@@ -9,12 +9,12 @@ num_repetitions="$2"
 script="$1"
 
 max_num_processes=256
-# 4194304 is ~19mb per process - 16777216 is ~75mb per process - 33554432 * 4 bytes - is a max_data_size of ~150mb per process
+# 4194304 is ~16mb per process - 16777216 is ~67mb per process - 33554432 is ~135mb per process
 max_data_size=4194304
 
 # Using smaller values leads to latency bounded tests..
-# I do 250000 which is 1mb of data per task / 2500000 which is 10mb of data per task
-fixed_data_size=25000000 # 2500000 # 250000
+# I do 250000 which is 1mb of data per task / 2500000 which is 10mb of data per task / 7500000 which is 30mb of data per task
+fixed_data_size=7500000 # 2500000 # 250000
 
 # I run with 32 / 64 / 256
 fixed_num_processes=256 # 64  # 32
