@@ -1,9 +1,6 @@
 # Cloud-Based File Storage System Project Report
 
-<p align="center" width="100%">
-    <img width="50%" src="./images/nextcloud_system_design.png">
-</p>
-
+![nextcloud_system_design](https://github.com/JunkyByte/final_hpc_and_cloud/assets/24314647/55386fdb-6b40-4dde-a5c4-9e1a722dc47d)
 
 ## Introduction
 
@@ -98,10 +95,10 @@ sh delete_data_test_users.sh
 I attach two charts of the results, where the run is performed on my laptop which is M2 Macbook Air, note that encryption is enabled during these tests. The tests spawn up to 10 and 20 concurrent users. As we can see my laptop is able to handle 10 users without any failure but starts to struggle and fail requests when we increase to 20.
 
 > 10 user:
-![10user_chart](images/locust_10user.png)
+![locust_10user](https://github.com/JunkyByte/final_hpc_and_cloud/assets/24314647/32ea805f-eed5-44ed-adef-d00aa7dbad7c)
 
 > 20 user
-![20user_chart](images/locust_20user.png)
+![locust_20user](https://github.com/JunkyByte/final_hpc_and_cloud/assets/24314647/0afd4812-9fbc-40b8-b482-c274944461cd)
 
 Analyzing the locust report with 20 concurrent users reveals server issues, particularly in serving requests. Simple PUT requests experience delays of up to 5 seconds. To pinpoint the problem, additional tests are needed to determine if it's related to CPU or IO constraints.
 
