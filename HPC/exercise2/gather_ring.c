@@ -59,8 +59,6 @@ int main(int argc, char** argv) {
     // which we assume to be ID 0
     // We create a ring communication in which each process sends
     // it's data to the left process until root receives all data.
-    // this increases the number of communications but reduces the
-    // each communication data size
 
     // *** SETUP
     int* curr_buffer = recv_buffer;

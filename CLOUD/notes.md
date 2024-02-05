@@ -19,8 +19,19 @@ SQLite should only be used for minimal and development instances. For production
 If you use clients for file syncing, the use of SQLite is highly discouraged.
 ```
 
+To skip the setup
 
-I create a custom version of the docker image
-build with  `docker build -t custom-nextcloud:latest .`
+```bash
+docker run -d \
+  -p 8080:80 \
+  --name my-nextcloud-container \
+  -e SQLITE_DATABASE=nextcloud \
+  -e NEXTCLOUD_ADMIN_USER=admin \
+  -e NEXTCLOUD_ADMIN_PASSWORD=your_admin_password \
+  nextcloud:latest
+```
 
-Run with `docker run -d -p 8080:80 --name my-custom-nextcloud custom-nextcloud:latest`
+
+```bash
+curl -u admin:your_admin_password -T ~/Downloads/Lecture01.pdf "http://localhost:8080/remote.php/dav/files/admin/"
+```
