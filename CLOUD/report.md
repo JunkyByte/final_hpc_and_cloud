@@ -76,5 +76,16 @@ By default nextcloud will only address requests made from localhost. To make loc
 docker exec --user www-data nextcloud /var/www/html/occ config:system:set trusted_domains 1 --value=nextcloud
 ```
 
+Locust needs a few users to interact with nextcloud. We can 30 locust test users by running the convenient:
+```bash
+sh add_users_to_nextcloud.sh
+```
+
 It might take a minute for nextcloud to reload its configuration.
 To perform load tests we can now use locust web ui from `http://localhost:8089/`.
+
+---- TODO
+Once the tests are finished we can free up all space used by the test users with
+```bash
+sh delete_data_test_users.sh
+```
