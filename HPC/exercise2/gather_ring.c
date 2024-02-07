@@ -69,7 +69,6 @@ int main(int argc, char** argv) {
     MPI_Barrier(MPI_COMM_WORLD);
     start_time = MPI_Wtime();
 
-    // We can use non blocking send and blocking receive.
     // each time we receive we can send to previous process.
     // root just waits for all communications
     // rank j receives n - j - 1 messages and does n - j send
@@ -77,24 +76,13 @@ int main(int argc, char** argv) {
     if (rank != 0){
         // Start by sending your own data
         // printf("I am %d and I'm sending my initial data\n", rank);
-        MPI_Isend(send_data, SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD, &req);
+        MPI_Send(send_data, SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD);
         for (int i=0; i<size-rank-1; i++){
-            // Perform all other receive and send
-            // printf("I am %d and I'm waiting to receive my %d communication\n", rank, i + 1);
-            MPI_Recv(recv_buffer, SEND_COUNT, MPI_INT, MPI_ANY_SOURCE, rank + 1, MPI_COMM_WORLD, &status);
-            // TODO: Here for simplicity I wait for previous communications to be done
-            // multiple sends could be done in parallel by same process
-            // but then I should check if they are actually received in order.
-            // also the recv buffer should then be processed differently
-            // we could do this by using tags to indicate the current communication so that
-            // we receive in order and use bufferend non blocking send
-            MPI_Wait(&req, MPI_STATUS_IGNORE);  // I do not need to get the status
-            MPI_Isend(recv_buffer, SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD, &req);
-            // printf("I am %d and I'm sending my %d communication\n", rank, i + 1);
+            MPI_Recv(recv_buffer, SEND_COUNT, MPI_INT, rank + 1, rank + 1, MPI_COMM_WORLD, &status);
+            MPI_Send(recv_buffer, SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD);
         }
-        MPI_Wait(&req, MPI_STATUS_IGNORE);  // I do not need to get the status
     } else {
-        // Issue Irecv
+        // Issue recv
         for (int i=0; i<size - 1; i++){
             // printf(">>> I am %d and I'm waiting to receive my %d communication\n", rank, i + 1);
             curr_buffer += SEND_COUNT;  // Move buffer pointer along
@@ -107,13 +95,13 @@ int main(int argc, char** argv) {
     delta = end_time - start_time;
 
     // TODO: Write test code that verifies gather is correct
-    //if (rank == 0) {
-    //     printf("Gathered data at the root process:\n");
-    //     for (int i = 0; i < size * SEND_COUNT; ++i) {
-    //         printf("%d ", recv_buffer[i]);
-    //     }
-    //     printf("\n");
-    //}
+    if (rank == 0) {
+         printf("Gathered data at the root process:\n");
+         for (int i = 0; i < size * SEND_COUNT; ++i) {
+             printf("%d ", recv_buffer[i]);
+         }
+         printf("\n");
+    }
 
     // free and print the time taken by the communication
     free(recv_buffer);

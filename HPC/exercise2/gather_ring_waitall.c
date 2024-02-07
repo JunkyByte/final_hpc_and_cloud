@@ -36,6 +36,9 @@ int main(int argc, char** argv) {
             else
                 recv_buffer[k] = 0;
         }
+    } else {
+        // rank j need a buffer where they can store n - j messages
+        recv_buffer = (int*)malloc((size - rank) * SEND_COUNT * sizeof(int));
     }
 
     int send_data[SEND_COUNT];
@@ -47,30 +50,41 @@ int main(int argc, char** argv) {
     }
     // ************************************
 
-    MPI_Status status;
+    for (int i=0; i<SEND_COUNT; i++){
+        recv_buffer[i] = send_data[i];
+    }
 
     // Timing variables
     double start_time, end_time, delta;
 
     // The implementation
-    // Naive approach with blocking calls as baseline
-    // Each process but root call a send passing its rank as tag
-    // The rank is used only to receive the data in order
+    // Start the timer
+    // We want to end up with everything to root node
+    // which we assume to be ID 0
+    // We create a ring communication in which each process sends
+    // it's data to the left process until root receives all data.
 
     // *** SETUP
     int* curr_buffer = recv_buffer;
 
-    // Start the timer
+    MPI_Request req;
+    MPI_Status status;
+
+    MPI_Barrier(MPI_COMM_WORLD);
     start_time = MPI_Wtime();
 
+    // We can use non blocking send and blocking receive.
+    // each time we receive we can send to previous process.
+    // root just waits for all communications
+    // rank j receives 1 message and does 1 send
+    // rank 0 receives 1 message and does 0 send
+    curr_buffer += SEND_COUNT;
+
+    if (rank != size - 1)
+        MPI_Recv(curr_buffer, (size - rank - 1) * SEND_COUNT, MPI_INT, rank + 1, rank + 1, MPI_COMM_WORLD, &status);
+
     if (rank != 0){
-        MPI_Send(send_data, SEND_COUNT, MPI_INT, 0, rank, MPI_COMM_WORLD);
-    } else {
-        // Root calls one recv for each send
-        for (int i=1; i<size; i++){
-            curr_buffer += SEND_COUNT;  // Move buffer pointer along
-            MPI_Recv(curr_buffer, SEND_COUNT, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        }
+        MPI_Send(recv_buffer, (size - rank) * SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -79,16 +93,16 @@ int main(int argc, char** argv) {
 
     // TODO: Write test code that verifies gather is correct
     // if (rank == 0) {
-    //     printf("Gathered data at the root process:\n");
-    //     for (int i = 0; i < size * SEND_COUNT; ++i) {
-    //         printf("%d ", recv_buffer[i]);
-    //     }
-    //     printf("\n");
+    //      printf("Gathered data at the root process:\n");
+    //      for (int i = 0; i < size * SEND_COUNT; ++i) {
+    //          printf("%d ", recv_buffer[i]);
+    //      }
+    //      printf("\n");
     // }
 
     // free and print the time taken by the communication
+    free(recv_buffer);
     if (rank == 0) {
-        free(recv_buffer);
         printf("%f\n", delta); // / REPETITIONS);
     }
 

@@ -49,3 +49,9 @@ Therefore if NP is number of processes
 In strong scaling the amount of work should remain the same.
 
 Definition: Strong scaling measures how well a parallel algorithm performs as the problem size remains constant, but the number of processors is varied.
+
+
+TODO:
+
+It would be interesting to build a Gather ring where there are multiple Rings performed in parallel
+so the N processes are split in N/k actual chains each performing right to left ring communication. The most left node of each chain becomes the root process.

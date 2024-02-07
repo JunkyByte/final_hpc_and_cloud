@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
         // Issue Irecv
         for (int i=1; i<size; i++){
             curr_buffer += SEND_COUNT;  // Move buffer pointer along
-            MPI_Irecv(curr_buffer, SEND_COUNT, MPI_INT, MPI_ANY_SOURCE, i, MPI_COMM_WORLD, &reqs[i]);
+            MPI_Irecv(curr_buffer, SEND_COUNT, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &reqs[i]);
         }
 
         // Wait all requests to be done
