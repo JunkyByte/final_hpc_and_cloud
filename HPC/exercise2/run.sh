@@ -1,5 +1,20 @@
 #!/bin/bash
 
+#SBATCH --partition=EPYC
+#SBATCH --job-name=hpcex2
+#SBATCH --ntasks-per-node=128
+#SBATCH --cpus-per-task=1
+#SBATCH --nodes=2
+#sBATCH --mem=450gb
+#SBATCH --time=2:00:00
+#SBATCH --exclusive
+#SBATCH -A dssc
+#SBATCH --output=./output.log  # Redirect stdout to a file
+
+module purge
+module load openMPI/4.1.5/gnu
+cd /u/dssc/adonninelli/final/HPC/exercise2
+
 if [ "$#" -ne 2 ]; then
     echo "Usage: $0 <script> <num_repetitions>"
     exit 1
@@ -10,14 +25,14 @@ script="$1"
 
 max_num_processes=256
 # 4194304 is ~16mb per process - 16777216 is ~67mb per process - 33554432 is ~135mb per process
-max_data_size=4194304
+max_data_size=33554432
 
 # Using smaller values leads to latency bounded tests..
 # I do 250000 which is 1mb of data per task / 2500000 which is 10mb of data per task / 7500000 which is 30mb of data per task
-fixed_data_size=250  # 7500000 # 2500000 # 250000
+fixed_data_size=25000  # 7500000 # 2500000 # 250000
 
 # I run with 32 / 64 / 256
-fixed_num_processes=256 # 64  # 32
+fixed_num_processes=32 # 256  # 64  # 32
 
 csv_file="./results/${script%.c}_results_weakscaling_$fixed_data_size.csv"
 
@@ -30,7 +45,6 @@ do
     printf "> Weak Scaling - %s - Num Processes: %d - Data Size: %d - Fixed Data Size: %d\n" "$script" "$num_processes" "$fixed_data_size" "$fixed_data_size"
     sh ./single_run.sh "$script" "$num_processes" "$fixed_data_size" "$num_repetitions" "$csv_file"
 done
-
 
 # csv_file="./results/${script%.c}_results_strongscaling_$fixed_num_processes.csv"
 # 

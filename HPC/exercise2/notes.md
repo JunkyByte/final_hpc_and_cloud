@@ -38,10 +38,6 @@ The set of processes is conceptualized as a binary tree, where each process serv
 
 ## Scaling
 
-TODO MAPPING EQUALLY BETWEEN NODES OR WHATEVER
-
-TODO
-
 With a gather operation I am a bit confused on how to assess scaling.
 
 > Definition: Weak scaling measures how well a parallel algorithm performs as the problem size per processor or per core remains constant, but the overall problem size increases as more processors are added.

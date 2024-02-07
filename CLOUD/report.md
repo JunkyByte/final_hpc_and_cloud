@@ -65,34 +65,36 @@ In order to test the performance of the system in terms of load and IO operation
 
 ## Deployment
 
-The deployment is done through the usage of docker and docker-compose. We leverage docker-compose in order to connect locust to our nextcloud instance.
+The deployment is done through the usage of docker and docker-compose. We leverage docker-compose in order to connect locust to our nextcloud instance. By simple changes to the `docker-compose.yml` it is possible to switch the Database backend and modify the configuration of the Netxcloud instance.
 
-To simply run the docker containers, assuming you are in the folder containing the `docker-compose.yml` file simply run
+To simply run the docker containers, `cd` to the folder containing the `docker-compose.yml` file and run
 ```bash
 docker-compose up -d
 ```
 
-By default nextcloud will only address requests made from localhost. To make locust container requests to be accepted by nextcloud we need to add it to the trusted_domains. This is only necessary to make load tests run correctly.
+As a security measure by default nextcloud will only authorize requests made from localhost. To make locust container requests to be accepted by nextcloud we need to add it to the trusted_domains. This is only necessary to make the load tests run correctly.
 
 ```bash
 docker exec --user www-data nextcloud /var/www/html/occ config:system:set trusted_domains 1 --value=nextcloud
 ```
 
-Locust needs a few users to interact with nextcloud. We can 30 locust test users by running the convenient:
+Locust needs a few users to simulate interactions with nextcloud. We can spawn 30 test users for locust by using the convenient:
 ```bash
 sh add_users_to_nextcloud.sh
 ```
 
 It might take a minute for nextcloud to reload its configuration.
-To perform load tests we can now use locust web ui from `http://localhost:8089/`. I designed a few tasks that span creating new files of different sizes (1kb, 1mb and 1gb), read a user file, upload a text file and list all files of the user.
-> NOTE: The 1 gb file is not included and can be created with `dd if=/dev/zero of=./test-data/file_1gb bs=1M count=1024`
 
-Once the tests are finished we can free up all space used by the test users with
+To perform load tests we can now use the locust web ui from `http://localhost:8089/`. I designed a few tasks, contained in `tasks.py`, locust will, for instance, create new files of different sizes (1kb, 1mb and 1gb), read a user file content, upload a text file and request a list of all the files of the user.
+> NOTE: The 1 gb file is not included (because is 1gb!) and should be created with
+`dd if=/dev/zero of=./test-data/file_1gb bs=1M count=1024`
+
+Once the locust tests are finished it might be convenient to free up all storage space used by the test users with
 ```bash
 sh delete_data_test_users.sh
 ```
 
-I attach two charts of the results, where the run is performed on my laptop which is M2 Macbook Air, note that encryption is enabled during these tests. The tests spawn up to 10 and 20 concurrent users. As we can see my laptop is able to handle 10 users without any failure but starts to struggle and fail requests when we increase to 20.
+I attach two charts of the results, where the run is performed on my laptop which is M2 Macbook Air, note that encryption is enabled during these tests. I spawn respectively 10 and 20 concurrent users. As we can see my laptop is able to handle 10 users without any failure but starts to struggle and fail requests when we increase to 20.
 
 > 10 user:
 ![locust_10user](https://i.imgur.com/Xkydm3N.png)
@@ -102,9 +104,9 @@ I attach two charts of the results, where the run is performed on my laptop whic
 
 Analyzing the locust report with 20 concurrent users reveals server issues, particularly in serving requests. Simple PUT requests experience delays of up to 5 seconds. To pinpoint the problem, additional tests are needed to determine if it's related to CPU or IO constraints.
 
-```
-Method  Name	                                                  Min     Max (ms)
-PUT	/remote.php/dav/files/locust_user0/test_locust_file.txt	407	  35	  4537
+```python
+Method  Name	                                            #Reqs    Min (ms)   Max (ms)
+PUT	/remote.php/dav/files/locust_user0/test_locust_file.txt	 407	  35	    4537
 [...]
 ```
 
@@ -118,7 +120,7 @@ If an organization already owns a cluster of nodes or prefer an on-premise solut
 
 #### Advantages of Solution 1
 
-1. **Control and Ownership:** Organizations have full control over the hardware and infrastructure.
+1. **Control and Ownership:** The organization has full control over the hardware and infrastructure.
 
 2. **Customization:** On-premise solutions allow for customization of hardware configurations, optimizing the system to specific performance requirements.
 
@@ -126,11 +128,11 @@ If an organization already owns a cluster of nodes or prefer an on-premise solut
 
 4. **Security Policies:** An Organization can implement and enforce their own security policies without relying on third-party providers.
 
-5. **Data Residency:** On-premise deployment ensures that data stays within the organization physical or virtual infrastructure, which can be vital in case of very sensible data.
+5. **Data Residency:** On-premise deployment ensures that data stays within the organization physical or virtual infrastructure, which can be important in case of sensible data.
 
 #### Cost Considerations for Solution 1
 
-- **Infrastructure Costs:** An organization bears the cost of owning and maintaining the physical hardware or virtual machines for the cluster nodes. Note that every few years an on premise solution will require updates to the hardware as it becomes outdated or more prone to failures.
+- **Infrastructure Costs:** An organization bears the cost of owning and maintaining the physical hardware or virtual machines for the cluster nodes. Note that every few years an on premise solution might require upgrades of the hardware as it becomes outdated or more prone to failures.
 
 - **Backup System Costs:** Implementing a reliable backup system incurs additional costs.
 
