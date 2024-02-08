@@ -25,14 +25,14 @@ script="$1"
 
 max_num_processes=256
 # 4194304 is ~16mb per process - 16777216 is ~67mb per process - 33554432 is ~135mb per process
-max_data_size=4194304 
+max_data_size=16777216
 
 # Using smaller values leads to latency bounded tests..
 # I do 250000 which is 1mb of data per task / 2500000 which is 10mb of data per task / 7500000 which is 30mb of data per task
-fixed_data_size=7500000  # 7500000 # 2500000 # 250000
+fixed_data_size=2500000  # 7500000 # 2500000 # 250000
 
 # I run with 32 / 64 / 256
-fixed_num_processes=256 # 256  # 64  # 32
+fixed_num_processes=64 # 256  # 64  # 32
 
 csv_file="./results/${script%.c}_results_weakscaling_$fixed_data_size.csv"
 

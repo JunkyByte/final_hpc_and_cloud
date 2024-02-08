@@ -61,8 +61,6 @@ int main(int argc, char** argv) {
     // Start the timer
     // We want to end up with everything to root node
     // which we assume to be ID 0
-    // We create a ring communication in which each process sends
-    // it's data to the left process until root receives all data.
 
     // *** SETUP
     int* curr_buffer = recv_buffer;
@@ -83,9 +81,8 @@ int main(int argc, char** argv) {
     if (rank != size - 1)
         MPI_Recv(curr_buffer, (size - rank - 1) * SEND_COUNT, MPI_INT, rank + 1, rank + 1, MPI_COMM_WORLD, &status);
 
-    if (rank != 0){
+    if (rank != 0)
         MPI_Send(recv_buffer, (size - rank) * SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD);
-    }
 
     MPI_Barrier(MPI_COMM_WORLD);
     end_time = MPI_Wtime();

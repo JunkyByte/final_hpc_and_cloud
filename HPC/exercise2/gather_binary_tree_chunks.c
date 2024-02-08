@@ -4,6 +4,7 @@
 #include <mpi.h>
 #include "const.h"
 
+#define CHUNK_SIZE 1  // TODO
 
 int count_descendants(int current_rank, int size) {
     if (current_rank < size) {
@@ -71,75 +72,63 @@ void preorder_order_iterative(int tree_size, int* rank_to_tree_rank, int* tree_r
 
 
 int main(int argc, char** argv) {
-
-    // ****** INIT AND GENERATE DATA ******
     MPI_Init(&argc, &argv);
 
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    const int dummy_size = 10;  // Size of the dummy data
+    const int dummy_size = 10;
     char dummy_data[dummy_size];
 
-    // Warm-up phase
     for (int i = 0; i < 10; i++) {
-        // Use MPI_Send/MPI_Recv with dummy data
         MPI_Send(dummy_data, dummy_size, MPI_CHAR, (rank + 1) % size, 0, MPI_COMM_WORLD);
         MPI_Recv(dummy_data, dummy_size, MPI_CHAR, (rank + size - 1) % size, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
-    // this could be computed by a single one and shared, but its fine
     int rank_to_tree_rank[size];
     int tree_rank_to_rank[size];
     preorder_order_iterative(size, rank_to_tree_rank, tree_rank_to_rank);
 
-    // We now use argsort to choose ranks that will lead to an ordered result.
     int tree_rank = rank_to_tree_rank[rank];
-
-    // Who's this process?
     int parent = (tree_rank - 1) / 2;
     int parent_rank = tree_rank_to_rank[parent];
-
     int left_child = 2 * tree_rank + 1;
-    int left_child_rank = (left_child < size) ? tree_rank_to_rank[left_child]: -1;
-
+    int left_child_rank = (left_child < size) ? tree_rank_to_rank[left_child] : -1;
     int right_child = 2 * tree_rank + 2;
-    int right_child_rank = (right_child < size) ? tree_rank_to_rank[right_child]: -1;
-
+    int right_child_rank = (right_child < size) ? tree_rank_to_rank[right_child] : -1;
     int num_children = (2 * tree_rank + 2 < size) ? 2 : ((2 * tree_rank + 1 < size) ? 1 : 0);
-    int is_leaf = (2 * tree_rank + 1 >= size && 2 * tree_rank + 2 >= size) ? 1 : 0;
-    int total_height = floor(log2(size + 1));
-    int height = floor(log2(tree_rank + 1));
     int total_descendants = (tree_rank < size) ? count_descendants(2 * tree_rank + 1, size) + count_descendants(2 * tree_rank + 2, size) : 0;
     int left_descendants = (left_child < size) ? 1 + count_descendants(2 * left_child + 1, size) + count_descendants(2 * left_child + 2, size) : 0;
     int right_descendants = total_descendants - left_descendants;
 
-    // The amount of total data the node holds and the amount it should receive
-    size_t TOTAL_COUNT = (1 + total_descendants) * SEND_COUNT;
-    size_t RECEIVE_COUNT_LEFT = left_descendants * SEND_COUNT;
-    size_t RECEIVE_COUNT_RIGHT = right_descendants * SEND_COUNT;
+    size_t TOTAL_COUNT = (1 + total_descendants) * CHUNK_SIZE;
+    size_t RECEIVE_COUNT_LEFT = left_descendants * CHUNK_SIZE;
+    size_t RECEIVE_COUNT_RIGHT = right_descendants * CHUNK_SIZE;
 
-    // printf("I am %d tree rank %d and I have %d children, %d left, %d right\n", rank, tree_rank, total_descendants, left_descendants, right_descendants);
-    // printf("I am %d and I my buffer size %d left %d right %d\n", rank, TOTAL_COUNT, RECEIVE_COUNT_LEFT, RECEIVE_COUNT_RIGHT);
-
-    // Allocate memory for the process and gathered data at each layer
-    // Note that each node will have to receive a certain amount of data based on TOTAL number of descendants
-    int* recv_buffer = (int*)malloc(TOTAL_COUNT * sizeof(int));
+    int* recv_buffer = NULL; 
+    int* tmp_buffer = NULL; 
+    if (rank == 0){ // Root needs space for whole data and one to receive messages
+        recv_buffer = (int*) malloc((1 + total_descendants) * SEND_COUNT * sizeof(int));
+        tmp_buffer = (int*) malloc(total_descendants * CHUNK_SIZE * sizeof(int));
+    } else // Every other rank need space for 1 chunk
+        recv_buffer = (int*) malloc(TOTAL_COUNT * sizeof(int));
 
     int send_data[SEND_COUNT];
-    for (int i=0; i<SEND_COUNT; i++){
-        if (SEND_COUNT < 128) // I use this for debugging
+    for (int i = 0; i < SEND_COUNT; i++) {
+        if (SEND_COUNT < 128)
             send_data[i] = rank * SEND_COUNT + i;
         else
             send_data[i] = rank;
     }
-
-    // We copy the send data to the receive buffer (we could have populated it directly).
-    // We will only send it after receiving anyway :)
-    for (int i=0; i<SEND_COUNT; i++){
-        recv_buffer[i] = send_data[i];
+    
+    if (rank == 0){
+        for (int i=0; i<SEND_COUNT; i++){
+            recv_buffer[i] = send_data[i];
+        }
     }
+
+    int TOTAL_CHUNKS = SEND_COUNT / CHUNK_SIZE;
 
     // ************************************
 
@@ -149,36 +138,55 @@ int main(int argc, char** argv) {
     // We want to end up with everything to root node
     // which we assume to be ID 0
 
-    // *** SETUP
-    int* curr_buffer = recv_buffer;
-
     MPI_Request req_receive[num_children];
 
     MPI_Barrier(MPI_COMM_WORLD);
     start_time = MPI_Wtime();
 
-    // We use the variables defined above to know how many communications etc.
-    // All non leaf nodes will issue their receive operations
-    // Note that the amount of data differs between layers of the tree
-    if (left_child < size){
-        curr_buffer += SEND_COUNT;
-        MPI_Irecv(curr_buffer, RECEIVE_COUNT_LEFT, MPI_INT, left_child_rank, 0, MPI_COMM_WORLD, &req_receive[0]);
-        if (right_child < size){
-            curr_buffer += RECEIVE_COUNT_LEFT;
-            MPI_Irecv(curr_buffer, RECEIVE_COUNT_RIGHT, MPI_INT, right_child_rank, 0, MPI_COMM_WORLD, &req_receive[1]);
-        }
-    }
-
-    if (num_children)
-        MPI_Waitall(num_children, req_receive, MPI_STATUS_IGNORE);
-
-    // All process also send data, here non leaf will have already received their part
-    // while leaf nodes are always free to send
-
-    // Everybody does a send but root!
+    // Split the data into chunks and perform the gather operation on each chunk
     if (rank != 0){
-        // Does a single send! It can be blocking because once it is done the work is finished.
-        MPI_Send(recv_buffer, TOTAL_COUNT, MPI_INT, parent_rank, 0, MPI_COMM_WORLD);
+        for (int chunk = 0; chunk < TOTAL_CHUNKS; chunk++) {
+            for (int i = 0; i < CHUNK_SIZE; i++) {
+                recv_buffer[i] = send_data[chunk * CHUNK_SIZE + i];
+                printf("Copied to send: %d\n", send_data[chunk * CHUNK_SIZE + i]);
+            }
+
+            if (left_child < size) {
+                printf("CHILD Receive left %d\n", chunk);
+                MPI_Irecv(recv_buffer + CHUNK_SIZE, RECEIVE_COUNT_LEFT, MPI_INT, left_child_rank, chunk, MPI_COMM_WORLD, &req_receive[0]);
+                if (right_child < size)
+                    MPI_Irecv(recv_buffer + CHUNK_SIZE + RECEIVE_COUNT_LEFT, RECEIVE_COUNT_RIGHT, MPI_INT, right_child_rank, chunk, MPI_COMM_WORLD, &req_receive[1]);
+            }
+
+            if (num_children) {
+                MPI_Waitall(num_children, req_receive, MPI_STATUSES_IGNORE);
+            }
+
+            printf("CHILD Sending %d\n", chunk);
+            MPI_Send(recv_buffer, TOTAL_COUNT, MPI_INT, parent_rank, chunk, MPI_COMM_WORLD);
+        }
+    } else {
+        for (int chunk = 0; chunk < TOTAL_CHUNKS; chunk++) {
+            if (left_child < size) {
+                printf("CHILD Receive left %d\n", chunk);
+                MPI_Irecv(tmp_buffer, RECEIVE_COUNT_LEFT, MPI_INT, left_child_rank, chunk, MPI_COMM_WORLD, &req_receive[0]);
+                if (right_child < size)
+                    MPI_Irecv(tmp_buffer + RECEIVE_COUNT_LEFT, RECEIVE_COUNT_RIGHT, MPI_INT, right_child_rank, chunk, MPI_COMM_WORLD, &req_receive[1]);
+            }
+
+            if (num_children) {
+                MPI_Waitall(num_children, req_receive, MPI_STATUSES_IGNORE);
+            }
+
+            printf("Received %d\n", chunk);
+
+            // I need to copy data from tmp_buffer to recv_buffer in the correct place
+            for (int i=0; i<total_descendants * CHUNK_SIZE; i++){
+                printf("%d ", tmp_buffer[i]);
+                recv_buffer[SEND_COUNT + chunk * CHUNK_SIZE + i * TOTAL_CHUNKS] = tmp_buffer[i];
+            }
+            printf("\n");
+        }
     }
 
     MPI_Barrier(MPI_COMM_WORLD);

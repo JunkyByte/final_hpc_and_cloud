@@ -62,8 +62,6 @@ int main(int argc, char** argv) {
 
     // *** SETUP
     int* curr_buffer = recv_buffer;
-
-    MPI_Request req;
     MPI_Status status;
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -95,13 +93,13 @@ int main(int argc, char** argv) {
     delta = end_time - start_time;
 
     // TODO: Write test code that verifies gather is correct
-    if (rank == 0) {
-         printf("Gathered data at the root process:\n");
-         for (int i = 0; i < size * SEND_COUNT; ++i) {
-             printf("%d ", recv_buffer[i]);
-         }
-         printf("\n");
-    }
+    // if (rank == 0) {
+    //      printf("Gathered data at the root process:\n");
+    //      for (int i = 0; i < size * SEND_COUNT; ++i) {
+    //          printf("%d ", recv_buffer[i]);
+    //      }
+    //      printf("\n");
+    // }
 
     // free and print the time taken by the communication
     free(recv_buffer);

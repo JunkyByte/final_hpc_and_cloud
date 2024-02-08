@@ -33,7 +33,7 @@ host_spec="${host_spec:1}"
 for ((rep=1; rep<=$num_repetitions; rep++))
 do
     # Run the executable using mpirun
-    timing=$(mpirun --mca coll_tuned_use_dynamic_rules true --mca coll_tuned_gather_algorithm 2 --map-by core -H "$host_spec" "./build/out_${script%.c}")
+    timing=$(mpirun --mca coll_tuned_use_dynamic_rules true --mca coll_tuned_gather_algorithm 3 --map-by core -H "$host_spec" "./build/out_${script%.c}")
 
     # Print the timing information with alignment
     printf "Repetition %d - Processes: %-3d | Data Size: %-5d | Timing: %s\n" "$rep" "$num_processes" "$data_size" "$timing"
