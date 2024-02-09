@@ -149,54 +149,54 @@ int main(int argc, char** argv) {
     // We want to end up with everything to root node
     // which we assume to be ID 0
     // *** SETUP
-    int* curr_buffer = recv_buffer;
+    for (int k=0; k<REPETITIONS;k++){
+        int* curr_buffer = recv_buffer;
+        MPI_Request req_receive[num_children];
 
-    MPI_Request req_receive[num_children];
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    start_time = MPI_Wtime();
-
-    // We use the variables defined above to know how many communications etc.
-    // All non leaf nodes will issue their receive operations
-    // Note that the amount of data differs between layers of the tree
-    if (left_child < size){
-        curr_buffer += SEND_COUNT;
-        MPI_Irecv(curr_buffer, RECEIVE_COUNT_LEFT, MPI_INT, left_child_rank, 0, MPI_COMM_WORLD, &req_receive[0]);
-        if (right_child < size){
-            curr_buffer += RECEIVE_COUNT_LEFT;
-            MPI_Irecv(curr_buffer, RECEIVE_COUNT_RIGHT, MPI_INT, right_child_rank, 0, MPI_COMM_WORLD, &req_receive[1]);
+        // We use the variables defined above to know how many communications etc.
+        // All non leaf nodes will issue their receive operations
+        // Note that the amount of data differs between layers of the tree
+        if (left_child < size){
+            curr_buffer += SEND_COUNT;
+            MPI_Irecv(curr_buffer, RECEIVE_COUNT_LEFT, MPI_INT, left_child_rank, 0, MPI_COMM_WORLD, &req_receive[0]);
+            if (right_child < size){
+                curr_buffer += RECEIVE_COUNT_LEFT;
+                MPI_Irecv(curr_buffer, RECEIVE_COUNT_RIGHT, MPI_INT, right_child_rank, 0, MPI_COMM_WORLD, &req_receive[1]);
+            }
         }
+
+        if (num_children)
+            MPI_Waitall(num_children, req_receive, MPI_STATUS_IGNORE);
+
+        // All process also send data, here non leaf will have already received their part
+        // while leaf nodes are always free to send
+
+        // Everybody does a send but root!
+        if (rank != 0){
+            // Does a single send! It can be blocking because once it is done the work is finished.
+            MPI_Send(recv_buffer, TOTAL_COUNT, MPI_INT, parent_rank, 0, MPI_COMM_WORLD);
+        }
+
+        end_time = MPI_Wtime();
+        delta += end_time - start_time;
     }
-
-    if (num_children)
-        MPI_Waitall(num_children, req_receive, MPI_STATUS_IGNORE);
-
-    // All process also send data, here non leaf will have already received their part
-    // while leaf nodes are always free to send
-
-    // Everybody does a send but root!
-    if (rank != 0){
-        // Does a single send! It can be blocking because once it is done the work is finished.
-        MPI_Send(recv_buffer, TOTAL_COUNT, MPI_INT, parent_rank, 0, MPI_COMM_WORLD);
-    }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    end_time = MPI_Wtime();
-    delta = end_time - start_time;
 
     // TODO: Write test code that verifies gather is correct
-    if (rank == 0) {
-         printf("Gathered data at the root process:\n");
-         for (int i = 0; i < size * SEND_COUNT; ++i) {
-             printf("%d ", recv_buffer[i]);
-         }
-         printf("\n");
-    }
+    // if (rank == 0) {
+    //      printf("Gathered data at the root process:\n");
+    //      for (int i = 0; i < size * SEND_COUNT; ++i) {
+    //          printf("%d ", recv_buffer[i]);
+    //      }
+    //      printf("\n");
+    // }
 
     // free and print the time taken by the communication
     free(recv_buffer);
     if (rank == 0) {
-        printf("%f\n", delta); // / REPETITIONS);
+        printf("%f\n", delta / REPETITIONS);
     }
 
     MPI_Finalize();

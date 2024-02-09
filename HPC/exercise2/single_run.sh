@@ -1,15 +1,14 @@
 #!/bin/bash
 
-if [ "$#" -ne 5 ]; then
-    echo "Usage: $0 <script> <num_processes> <data_size> <num_repetitions> <out_csv>"
+if [ "$#" -ne 4 ]; then
+    echo "Usage: $0 <script> <num_processes> <data_size> <out_csv>"
     exit 1
 fi
 
 script="$1"
 num_processes="$2"
 data_size="$3"
-num_repetitions="$4"
-csv_file="$5"
+csv_file="$4"
 
 # Get the node names using scontrol show hostnames
 node_names=$(scontrol show hostnames)
@@ -29,15 +28,11 @@ done
 # Remove the leading comma
 host_spec="${host_spec:1}"
 
-# Loop through the number of repetitions
-for ((rep=1; rep<=$num_repetitions; rep++))
-do
-    # Run the executable using mpirun
-    timing=$(mpirun --map-by core -H "$host_spec" "./build/out_${script%.c}")
+# Run the executable using mpirun
+timing=$(mpirun --map-by core --mca coll_tuned_use_dynamic_rules true --mca coll_tuned_gather_algorithm 2 -H "$host_spec" "./build/out_${script%.c}")
 
-    # Print the timing information with alignment
-    printf "Repetition %d - Processes: %-3d | Data Size: %-5d | Timing: %s\n" "$rep" "$num_processes" "$data_size" "$timing"
+# Print the timing information with alignment
+printf "Processes: %-3d | Data Size: %-5d | Timing: %s\n" "$num_processes" "$data_size" "$timing"
 
-    # Append the timing information to the CSV file
-    echo "$rep,$num_processes,$data_size,$timing" >> "$csv_file"
-done
+# Append the timing information to the CSV file
+echo "$num_processes,$data_size,$timing" >> "$csv_file"

@@ -57,32 +57,32 @@ int main(int argc, char** argv) {
 
     // *** SETUP
     int* curr_buffer = recv_buffer;
+    for (int k=0; k<REPETITIONS;k++){
+        int* curr_buffer = recv_buffer;
+        // Create a vector of MPI_Requests to hold requests.
+        MPI_Request reqs[size];
 
-    // Create a vector of MPI_Requests to hold requests.
-    MPI_Request reqs[size];
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
 
-    // Start the timer
-    MPI_Barrier(MPI_COMM_WORLD);
-    start_time = MPI_Wtime();
+        if (rank != 0){
+            MPI_Send(send_data, SEND_COUNT, MPI_INT, 0, rank, MPI_COMM_WORLD);
+        } else {
 
-    if (rank != 0){
-        MPI_Send(send_data, SEND_COUNT, MPI_INT, 0, rank, MPI_COMM_WORLD);
-    } else {
+            // Issue Irecv
+            for (int i=1; i<size; i++){
+                curr_buffer += SEND_COUNT;  // Move buffer pointer along
+                MPI_Irecv(curr_buffer, SEND_COUNT, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &reqs[i]);
+            }
 
-        // Issue Irecv
-        for (int i=1; i<size; i++){
-            curr_buffer += SEND_COUNT;  // Move buffer pointer along
-            MPI_Irecv(curr_buffer, SEND_COUNT, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &reqs[i]);
+            // Wait all requests to be done
+            for (int i=1; i<size; i++)
+                MPI_Wait(&reqs[i], MPI_STATUS_IGNORE);  // I do not need to get the status
         }
 
-        // Wait all requests to be done
-        for (int i=1; i<size; i++)
-            MPI_Wait(&reqs[i], MPI_STATUS_IGNORE);  // I do not need to get the status
+        end_time = MPI_Wtime();
+        delta += end_time - start_time;
     }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    end_time = MPI_Wtime();
-    delta = end_time - start_time;
 
     // TODO: Write test code that verifies gather is correct
     // if (rank == 0) {
@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
     // free and print the time taken by the communication
     if (rank == 0) {
         free(recv_buffer);
-        printf("%f\n", delta); // / REPETITIONS);
+        printf("%f\n", delta / REPETITIONS);
     }
 
     MPI_Finalize();

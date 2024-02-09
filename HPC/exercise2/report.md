@@ -21,7 +21,7 @@ The gathered data must be ordered as the ranks assigned to the processes.
 
 ## Experimental Setup
 
-In order to obtain more consistent timings I perform multiple runs of all the algorithms and average the timings, I also perform a warmup of the communication channels passing dummy data between the processes. For each solution I only time the actual gather operation and not the variable setup required by different algorithms. To perform all the timings I write a set of bash scripts which allow to perform weak and strong scaling measurements of the different implementations. The tests are performed on ORFEO cluster using the epyc partition. A varying amount of nodes and data sizes is used to assess both weak and strong scaling features of the different implementations, more details in the **Results** section.
+In order to obtain more consistent timings I perform multiple runs of all the algorithms therefore getting an average run time. I also perform a warmup of the communication channels passing dummy data between the processes. For each solution I only time the actual gather operation and not the variable setup required by different algorithms. To perform all the timings I write a set of bash scripts which allow to perform weak and strong scaling measurements of all the implementations. The tests are performed on ORFEO cluster using the epyc partition. A varying amount of nodes and data sizes is used to assess both weak and strong scaling features of the different implementations, more details in the **Results** section.
 
 ## Implementations
 Let's discuss the different implementations I propose:
@@ -55,7 +55,7 @@ I imagined that using non blocking receive would improve results but it proved o
 
 ### gather_ring.c
 
-I experimented with a different communication pattern between the processes. Assuming root is rank 0, I create a ring communication in which each process sends current data to left process until root receives all the data. (The name gather_pipeline would have been a more sensible choice). This pattern is not very efficient but is a good exercise.
+I experimented with a different communication pattern between the processes. Assuming root is rank `0`, I create a ring communication in which each process sends current data to left process until root receives all the data. (The name gather_pipeline would have been a more sensible choice). This pattern is not very efficient but is a good exercise.
 
 ![ring_fig](https://i.imgur.com/ENxdRtM.png)
 
@@ -93,7 +93,7 @@ if (rank != 0){
 
 I thought of using buffered non blocking send in order to reuse the buffer and issue a recv before the previous send finishes but while it worked for me locally I received an error on ORFEO. It might be that buffered send are disabled or I am making some basic mistake. `[epyc003] pml_ucx.c:743  Error: bsend: failed to allocate buffer`.
 
-Anyway, the idea was to use the following loop for `rank != 0`:
+The idea was to use the following loop for `rank != 0`:
 ```c
 MPI_Request req;
 MPI_Isend(send_data, SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD, &req);
@@ -178,12 +178,45 @@ I also provide a version of the binary tree (`gather_binary_tree_chunks.c`) with
 
 ## Results
 
-TODO
+The experiments are all run using 2 EPYC nodes and varying amount of processes, equally distributed among the nodes. I perform all experiments using map-by `core` policy. I would expect different results using a policy such as `node` but I focus mostly on other aspects of the performance assessment and did not perform experiments on this regard.
 
+We compare all timings with the `MPI_Gather` collective operation builtin OpenMPI. I plot the results of both the `linear` and `binomial` implementations.
 
+In order to evaluate the performances of the different algorithms I repeat the timings multiple times. The number of repetitions depend on the number of processes and data size, ranging from up to `10000` iterations for very small data sizes down to `10` for very large ones. Using small data sizes lead to latency bounded tests which are subject to large fluctuations between different runs, therefore using a larger number of repetitions is vital in order to obtain consistent timings.
 
+I perform two different tests, to address weak and strong scaling.
+In weak scaling I vary the number of total processes with a fixed amount of data assigned to each one.
+In strong scaling the amount of data per process varies while the total amount of processes is fixed.
 
+Weak scaling in this scenario allows to inspect how efficiently one of the gather algorithms scales when the number of processes increase. It is important because algorithms such as binary tree, ring and linear have different communication patterns and are expected to scale differently.
 
+On the other hand strong scaling allows to inspect how efficiently one of the gather algorithms scale as the data that has to be shared changes. Since ORFEO has powerful communication infrastructure between nodes providing large bandwith for communications it is indeed interesting to inspect strong scaling and see if and how the different communications patterns implemented are able to efficiently utilize the bandwidth capacity.
 
+Both these tests fix one parameter of computation. I varied this fixed values, trying to uncover different aspects of the scaling.
 
+### Weak scaling
 
+First we plot the results of weak scaling for different fixed data sizes.
+
+For small data size per process of `1kb` we get interesting results.
+
+![weak1kb](https://i.imgur.com/XdFiutY.png)
+
+As we can see the binary tree based implementation scales very well with such small data sizes, I would expect an even greater gain if we increase the number of cores further. The linear approaches are still competitive while the ring one already falls short. We can also observe that `naive_gather` performs worse than the `mpi_gather_linear` OpenMPI implementation even though they should be similar approaches.
+
+The results progressively change as we increase the data size. Using `10kb` per process the gain of the binary tree is reduced and the linear approaches look now more competitive:
+
+![weak10kb](https://i.imgur.com/5S34BPH.png)
+
+The difference between my `naive_gather` and the original implementation is now negligible.
+Increaseing further the data sizes only confirms the current trends.
+
+![weak1mb](https://i.imgur.com/4mf2Xnx.png)
+
+With larger sizes we get exactly the same results. I conclude that linear approaches become more and more competitive as data size increases. On the other hand when the processes share a modest amount of data and the experiments are more latency bounded approaches based on trees perform well as they divide the problem in multiple parallel layers of communication.
+
+### Strong scaling
+
+Let's see the results of strong scaling for varying amount of processes.
+
+I run the strong scaling tests also with very large amounts of data per process.

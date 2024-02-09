@@ -61,36 +61,37 @@ int main(int argc, char** argv) {
     // it's data to the left process until root receives all data.
 
     // *** SETUP
-    int* curr_buffer = recv_buffer;
-    MPI_Status status;
+    for (int k=0; k<REPETITIONS;k++){
+        int* curr_buffer = recv_buffer;
+        MPI_Status status;
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    start_time = MPI_Wtime();
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
 
-    // each time we receive we can send to previous process.
-    // root just waits for all communications
-    // rank j receives n - j - 1 messages and does n - j send
-    // rank 0 receives n - 1 messages and does 0 send
-    if (rank != 0){
-        // Start by sending your own data
-        // printf("I am %d and I'm sending my initial data\n", rank);
-        MPI_Send(send_data, SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD);
-        for (int i=0; i<size-rank-1; i++){
-            MPI_Recv(recv_buffer, SEND_COUNT, MPI_INT, rank + 1, rank + 1, MPI_COMM_WORLD, &status);
-            MPI_Send(recv_buffer, SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD);
+        // each time we receive we can send to previous process.
+        // root just waits for all communications
+        // rank j receives n - j - 1 messages and does n - j send
+        // rank 0 receives n - 1 messages and does 0 send
+        if (rank != 0){
+            // Start by sending your own data
+            // printf("I am %d and I'm sending my initial data\n", rank);
+            MPI_Send(send_data, SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD);
+            for (int i=0; i<size-rank-1; i++){
+                MPI_Recv(recv_buffer, SEND_COUNT, MPI_INT, rank + 1, rank + 1, MPI_COMM_WORLD, &status);
+                MPI_Send(recv_buffer, SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD);
+            }
+        } else {
+            // Issue recv
+            for (int i=0; i<size - 1; i++){
+                // printf(">>> I am %d and I'm waiting to receive my %d communication\n", rank, i + 1);
+                curr_buffer += SEND_COUNT;  // Move buffer pointer along
+                MPI_Recv(curr_buffer, SEND_COUNT, MPI_INT, 1, 1, MPI_COMM_WORLD, &status);
+            }
         }
-    } else {
-        // Issue recv
-        for (int i=0; i<size - 1; i++){
-            // printf(">>> I am %d and I'm waiting to receive my %d communication\n", rank, i + 1);
-            curr_buffer += SEND_COUNT;  // Move buffer pointer along
-            MPI_Recv(curr_buffer, SEND_COUNT, MPI_INT, 1, 1, MPI_COMM_WORLD, &status);
-        }
+
+        end_time = MPI_Wtime();
+        delta += end_time - start_time;
     }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    end_time = MPI_Wtime();
-    delta = end_time - start_time;
 
     // TODO: Write test code that verifies gather is correct
     // if (rank == 0) {
@@ -104,7 +105,7 @@ int main(int argc, char** argv) {
     // free and print the time taken by the communication
     free(recv_buffer);
     if (rank == 0) {
-        printf("%f\n", delta); // / REPETITIONS);
+        printf("%f\n", delta / REPETITIONS);
     }
 
     MPI_Finalize();

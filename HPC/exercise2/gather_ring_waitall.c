@@ -63,27 +63,27 @@ int main(int argc, char** argv) {
     // which we assume to be ID 0
 
     // *** SETUP
-    int* curr_buffer = recv_buffer;
+    for (int k=0; k<REPETITIONS;k++){
+        int* curr_buffer = recv_buffer;
+        MPI_Request req;
+        MPI_Status status;
 
-    MPI_Request req;
-    MPI_Status status;
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    start_time = MPI_Wtime();
+        // rank j receives 1 message and does 1 send
+        // rank 0 receives 1 message and does 0 send
+        curr_buffer += SEND_COUNT;
 
-    // rank j receives 1 message and does 1 send
-    // rank 0 receives 1 message and does 0 send
-    curr_buffer += SEND_COUNT;
+        if (rank != size - 1)
+            MPI_Recv(curr_buffer, (size - rank - 1) * SEND_COUNT, MPI_INT, rank + 1, rank + 1, MPI_COMM_WORLD, &status);
 
-    if (rank != size - 1)
-        MPI_Recv(curr_buffer, (size - rank - 1) * SEND_COUNT, MPI_INT, rank + 1, rank + 1, MPI_COMM_WORLD, &status);
+        if (rank != 0)
+            MPI_Send(recv_buffer, (size - rank) * SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD);
 
-    if (rank != 0)
-        MPI_Send(recv_buffer, (size - rank) * SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD);
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    end_time = MPI_Wtime();
-    delta = end_time - start_time;
+        end_time = MPI_Wtime();
+        delta += end_time - start_time;
+    }
 
     // TODO: Write test code that verifies gather is correct
     // if (rank == 0) {
@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
     // free and print the time taken by the communication
     free(recv_buffer);
     if (rank == 0) {
-        printf("%f\n", delta); // / REPETITIONS);
+        printf("%f\n", delta / REPETITIONS);
     }
 
     MPI_Finalize();

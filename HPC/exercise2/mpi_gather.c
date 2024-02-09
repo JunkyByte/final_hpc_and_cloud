@@ -50,15 +50,16 @@ int main(int argc, char** argv) {
 
     // Timing variables
     double start_time, end_time, delta;
-    MPI_Request req;
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    // Start the timer
-    start_time = MPI_Wtime();
-    MPI_Gather(send_data, SEND_COUNT, MPI_INT, recv_buffer, SEND_COUNT, MPI_INT, ROOT_ID, MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);
-    end_time = MPI_Wtime();
-    delta = end_time - start_time;
+    for (int k=0; k<REPETITIONS;k++){
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
+
+        MPI_Gather(send_data, SEND_COUNT, MPI_INT, recv_buffer, SEND_COUNT, MPI_INT, ROOT_ID, MPI_COMM_WORLD);
+
+        end_time = MPI_Wtime();
+        delta += end_time - start_time;
+    }
 
     // TODO: Write test code that verifies gather is correct
     // if (rank == 0) {
@@ -72,7 +73,7 @@ int main(int argc, char** argv) {
 
     // Print the time taken by the communication
     if (rank == ROOT_ID) {
-        printf("%f\n", delta); // / REPETITIONS);
+        printf("%f\n", delta / REPETITIONS);
     }
 
     MPI_Finalize();

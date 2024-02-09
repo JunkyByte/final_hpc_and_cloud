@@ -3,3 +3,7 @@
 #ifndef SEND_COUNT
 #define SEND_COUNT 32
 #endif
+
+#ifndef REPETITIONS
+#define REPETITIONS 10
+#endif

@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
 
     // Chunk size
-    int START_CHUNK_SIZE = min(SEND_COUNT, 2500000);  // 10 mb
+    int START_CHUNK_SIZE = min(SEND_COUNT, 250);  // 1 kb ?
     int CHUNK_SIZE = START_CHUNK_SIZE;
 
     int rank, size;
@@ -143,64 +143,71 @@ int main(int argc, char** argv) {
     // We want to end up with everything to root node
     // which we assume to be ID 0
 
-    MPI_Request req_receive[num_children];
     size_t send_pos = 0;
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    start_time = MPI_Wtime();
+    for (int k=0; k<REPETITIONS;k++){
+        int* curr_buffer = recv_buffer;
+        MPI_Request req_receive[num_children];
+        CHUNK_SIZE = START_CHUNK_SIZE;
+        TOTAL_COUNT = (1 + total_descendants) * CHUNK_SIZE;
+        RECEIVE_COUNT_LEFT = left_descendants * CHUNK_SIZE;
+        RECEIVE_COUNT_RIGHT = right_descendants * CHUNK_SIZE;
 
-    if (rank != 0){
-        for (int chunk = 0; chunk < TOTAL_CHUNKS + (REMAINDER != 0 ? 1: 0); chunk++) {
-            if (chunk == TOTAL_CHUNKS){ // Last chunk is smaller than CHUNK_SIZE
-                CHUNK_SIZE = REMAINDER;
-                TOTAL_COUNT = (1 + total_descendants) * CHUNK_SIZE;
-                RECEIVE_COUNT_LEFT = left_descendants * CHUNK_SIZE;
-                RECEIVE_COUNT_RIGHT = right_descendants * CHUNK_SIZE;
+        MPI_Barrier(MPI_COMM_WORLD);
+        start_time = MPI_Wtime();
+
+        if (rank != 0){
+            for (int chunk = 0; chunk < TOTAL_CHUNKS + (REMAINDER != 0 ? 1: 0); chunk++) {
+                if (chunk == TOTAL_CHUNKS){ // Last chunk is smaller than CHUNK_SIZE
+                    CHUNK_SIZE = REMAINDER;
+                    TOTAL_COUNT = (1 + total_descendants) * CHUNK_SIZE;
+                    RECEIVE_COUNT_LEFT = left_descendants * CHUNK_SIZE;
+                    RECEIVE_COUNT_RIGHT = right_descendants * CHUNK_SIZE;
+                }
+
+                for (int i = 0; i < CHUNK_SIZE; i++)
+                    recv_buffer[i] = send_data[send_pos++];
+
+                if (left_child < size) {
+                    MPI_Irecv(recv_buffer + CHUNK_SIZE, RECEIVE_COUNT_LEFT, MPI_INT, left_child_rank, chunk, MPI_COMM_WORLD, &req_receive[0]);
+                    if (right_child < size)
+                        MPI_Irecv(recv_buffer + CHUNK_SIZE + RECEIVE_COUNT_LEFT, RECEIVE_COUNT_RIGHT, MPI_INT, right_child_rank, chunk, MPI_COMM_WORLD, &req_receive[1]);
+                }
+
+                if (num_children)
+                    MPI_Waitall(num_children, req_receive, MPI_STATUSES_IGNORE);
+
+                MPI_Send(recv_buffer, TOTAL_COUNT, MPI_INT, parent_rank, chunk, MPI_COMM_WORLD);
             }
+        } else {
+            for (int chunk = 0; chunk < TOTAL_CHUNKS + (REMAINDER != 0 ? 1: 0); chunk++) {
+                if (chunk == TOTAL_CHUNKS){ // if last chunk is smaller than CHUNK_SIZE
+                    CHUNK_SIZE = REMAINDER;
+                    RECEIVE_COUNT_LEFT = left_descendants * CHUNK_SIZE;
+                    RECEIVE_COUNT_RIGHT = right_descendants * CHUNK_SIZE;
+                }
 
-            for (int i = 0; i < CHUNK_SIZE; i++)
-                recv_buffer[i] = send_data[send_pos++];
+                if (left_child < size) {
+                    MPI_Irecv(tmp_buffer, RECEIVE_COUNT_LEFT, MPI_INT, left_child_rank, chunk, MPI_COMM_WORLD, &req_receive[0]);
+                    if (right_child < size)
+                        MPI_Irecv(tmp_buffer + RECEIVE_COUNT_LEFT, RECEIVE_COUNT_RIGHT, MPI_INT, right_child_rank, chunk, MPI_COMM_WORLD, &req_receive[1]);
+                }
 
-            if (left_child < size) {
-                MPI_Irecv(recv_buffer + CHUNK_SIZE, RECEIVE_COUNT_LEFT, MPI_INT, left_child_rank, chunk, MPI_COMM_WORLD, &req_receive[0]);
-                if (right_child < size)
-                    MPI_Irecv(recv_buffer + CHUNK_SIZE + RECEIVE_COUNT_LEFT, RECEIVE_COUNT_RIGHT, MPI_INT, right_child_rank, chunk, MPI_COMM_WORLD, &req_receive[1]);
+                if (num_children)
+                    MPI_Waitall(num_children, req_receive, MPI_STATUSES_IGNORE);
+
+                // Tricky: I need to copy data from tmp_buffer to recv_buffer in the correct place
+                for (int i=0; i<total_descendants * CHUNK_SIZE; i++)
+                    recv_buffer[SEND_COUNT +  // After root data
+                                chunk * START_CHUNK_SIZE +  // After chunks already done
+                                i % CHUNK_SIZE +  // For chunk size consequent elements
+                                i / CHUNK_SIZE * SEND_COUNT] = tmp_buffer[i]; // Leave spaces for future chunks
             }
-
-            if (num_children)
-                MPI_Waitall(num_children, req_receive, MPI_STATUSES_IGNORE);
-
-            MPI_Send(recv_buffer, TOTAL_COUNT, MPI_INT, parent_rank, chunk, MPI_COMM_WORLD);
         }
-    } else {
-        for (int chunk = 0; chunk < TOTAL_CHUNKS + (REMAINDER != 0 ? 1: 0); chunk++) {
-            if (chunk == TOTAL_CHUNKS){ // if last chunk is smaller than CHUNK_SIZE
-                CHUNK_SIZE = REMAINDER;
-                RECEIVE_COUNT_LEFT = left_descendants * CHUNK_SIZE;
-                RECEIVE_COUNT_RIGHT = right_descendants * CHUNK_SIZE;
-            }
 
-            if (left_child < size) {
-                MPI_Irecv(tmp_buffer, RECEIVE_COUNT_LEFT, MPI_INT, left_child_rank, chunk, MPI_COMM_WORLD, &req_receive[0]);
-                if (right_child < size)
-                    MPI_Irecv(tmp_buffer + RECEIVE_COUNT_LEFT, RECEIVE_COUNT_RIGHT, MPI_INT, right_child_rank, chunk, MPI_COMM_WORLD, &req_receive[1]);
-            }
-
-            if (num_children)
-                MPI_Waitall(num_children, req_receive, MPI_STATUSES_IGNORE);
-
-            // Tricky: I need to copy data from tmp_buffer to recv_buffer in the correct place
-            for (int i=0; i<total_descendants * CHUNK_SIZE; i++)
-                recv_buffer[SEND_COUNT +  // After root data
-                            chunk * START_CHUNK_SIZE +  // After chunks already done
-                            i % CHUNK_SIZE +  // For chunk size consequent elements
-                            i / CHUNK_SIZE * SEND_COUNT] = tmp_buffer[i]; // Leave spaces for future chunks
-        }
+        end_time = MPI_Wtime();
+        delta += end_time - start_time;
     }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    end_time = MPI_Wtime();
-    delta = end_time - start_time;
 
     // TODO: Write test code that verifies gather is correct
     // if (rank == 0) {
@@ -214,7 +221,7 @@ int main(int argc, char** argv) {
     // free and print the time taken by the communication
     free(recv_buffer);
     if (rank == 0) {
-        printf("%f\n", delta); // / REPETITIONS);
+        printf("%f\n", delta / REPETITIONS);
     }
 
     MPI_Finalize();
