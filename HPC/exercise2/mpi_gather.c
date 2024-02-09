@@ -16,10 +16,9 @@ int main(int argc, char** argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
 
-    const int dummy_size = 10;  // Size of the dummy data
-    char dummy_data[dummy_size];
-
     // Warm-up phase
+    const int dummy_size = 10;
+    char dummy_data[dummy_size];
     for (int i = 0; i < 10; i++) {
         // Use MPI_Send/MPI_Recv with dummy data
         MPI_Send(dummy_data, dummy_size, MPI_CHAR, (rank + 1) % size, 0, MPI_COMM_WORLD);

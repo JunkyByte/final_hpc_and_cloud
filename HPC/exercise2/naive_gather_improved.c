@@ -62,6 +62,7 @@ int main(int argc, char** argv) {
     MPI_Request reqs[size];
 
     // Start the timer
+    MPI_Barrier(MPI_COMM_WORLD);
     start_time = MPI_Wtime();
 
     if (rank != 0){

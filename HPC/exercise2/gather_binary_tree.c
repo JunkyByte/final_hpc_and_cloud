@@ -148,7 +148,6 @@ int main(int argc, char** argv) {
 
     // We want to end up with everything to root node
     // which we assume to be ID 0
-
     // *** SETUP
     int* curr_buffer = recv_buffer;
 

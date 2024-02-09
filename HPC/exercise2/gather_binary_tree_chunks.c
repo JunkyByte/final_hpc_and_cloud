@@ -4,7 +4,7 @@
 #include <mpi.h>
 #include "const.h"
 
-#define CHUNK_SIZE 1  // TODO
+#define min(a, b) ((a) < (b) ? (a) : (b))
 
 int count_descendants(int current_rank, int size) {
     if (current_rank < size) {
@@ -74,6 +74,10 @@ void preorder_order_iterative(int tree_size, int* rank_to_tree_rank, int* tree_r
 int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
 
+    // Chunk size
+    int START_CHUNK_SIZE = min(SEND_COUNT, 2500000);  // 10 mb
+    int CHUNK_SIZE = START_CHUNK_SIZE;
+
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -122,13 +126,14 @@ int main(int argc, char** argv) {
             send_data[i] = rank;
     }
     
-    if (rank == 0){
+    if (rank == 0){ // Copy root data
         for (int i=0; i<SEND_COUNT; i++){
             recv_buffer[i] = send_data[i];
         }
     }
 
     int TOTAL_CHUNKS = SEND_COUNT / CHUNK_SIZE;
+    int REMAINDER = SEND_COUNT % CHUNK_SIZE;
 
     // ************************************
 
@@ -139,53 +144,57 @@ int main(int argc, char** argv) {
     // which we assume to be ID 0
 
     MPI_Request req_receive[num_children];
+    size_t send_pos = 0;
 
     MPI_Barrier(MPI_COMM_WORLD);
     start_time = MPI_Wtime();
 
-    // Split the data into chunks and perform the gather operation on each chunk
     if (rank != 0){
-        for (int chunk = 0; chunk < TOTAL_CHUNKS; chunk++) {
-            for (int i = 0; i < CHUNK_SIZE; i++) {
-                recv_buffer[i] = send_data[chunk * CHUNK_SIZE + i];
-                printf("Copied to send: %d\n", send_data[chunk * CHUNK_SIZE + i]);
+        for (int chunk = 0; chunk < TOTAL_CHUNKS + (REMAINDER != 0 ? 1: 0); chunk++) {
+            if (chunk == TOTAL_CHUNKS){ // Last chunk is smaller than CHUNK_SIZE
+                CHUNK_SIZE = REMAINDER;
+                TOTAL_COUNT = (1 + total_descendants) * CHUNK_SIZE;
+                RECEIVE_COUNT_LEFT = left_descendants * CHUNK_SIZE;
+                RECEIVE_COUNT_RIGHT = right_descendants * CHUNK_SIZE;
             }
 
+            for (int i = 0; i < CHUNK_SIZE; i++)
+                recv_buffer[i] = send_data[send_pos++];
+
             if (left_child < size) {
-                printf("CHILD Receive left %d\n", chunk);
                 MPI_Irecv(recv_buffer + CHUNK_SIZE, RECEIVE_COUNT_LEFT, MPI_INT, left_child_rank, chunk, MPI_COMM_WORLD, &req_receive[0]);
                 if (right_child < size)
                     MPI_Irecv(recv_buffer + CHUNK_SIZE + RECEIVE_COUNT_LEFT, RECEIVE_COUNT_RIGHT, MPI_INT, right_child_rank, chunk, MPI_COMM_WORLD, &req_receive[1]);
             }
 
-            if (num_children) {
+            if (num_children)
                 MPI_Waitall(num_children, req_receive, MPI_STATUSES_IGNORE);
-            }
 
-            printf("CHILD Sending %d\n", chunk);
             MPI_Send(recv_buffer, TOTAL_COUNT, MPI_INT, parent_rank, chunk, MPI_COMM_WORLD);
         }
     } else {
-        for (int chunk = 0; chunk < TOTAL_CHUNKS; chunk++) {
+        for (int chunk = 0; chunk < TOTAL_CHUNKS + (REMAINDER != 0 ? 1: 0); chunk++) {
+            if (chunk == TOTAL_CHUNKS){ // if last chunk is smaller than CHUNK_SIZE
+                CHUNK_SIZE = REMAINDER;
+                RECEIVE_COUNT_LEFT = left_descendants * CHUNK_SIZE;
+                RECEIVE_COUNT_RIGHT = right_descendants * CHUNK_SIZE;
+            }
+
             if (left_child < size) {
-                printf("CHILD Receive left %d\n", chunk);
                 MPI_Irecv(tmp_buffer, RECEIVE_COUNT_LEFT, MPI_INT, left_child_rank, chunk, MPI_COMM_WORLD, &req_receive[0]);
                 if (right_child < size)
                     MPI_Irecv(tmp_buffer + RECEIVE_COUNT_LEFT, RECEIVE_COUNT_RIGHT, MPI_INT, right_child_rank, chunk, MPI_COMM_WORLD, &req_receive[1]);
             }
 
-            if (num_children) {
+            if (num_children)
                 MPI_Waitall(num_children, req_receive, MPI_STATUSES_IGNORE);
-            }
 
-            printf("Received %d\n", chunk);
-
-            // I need to copy data from tmp_buffer to recv_buffer in the correct place
-            for (int i=0; i<total_descendants * CHUNK_SIZE; i++){
-                printf("%d ", tmp_buffer[i]);
-                recv_buffer[SEND_COUNT + chunk * CHUNK_SIZE + i * TOTAL_CHUNKS] = tmp_buffer[i];
-            }
-            printf("\n");
+            // Tricky: I need to copy data from tmp_buffer to recv_buffer in the correct place
+            for (int i=0; i<total_descendants * CHUNK_SIZE; i++)
+                recv_buffer[SEND_COUNT +  // After root data
+                            chunk * START_CHUNK_SIZE +  // After chunks already done
+                            i % CHUNK_SIZE +  // For chunk size consequent elements
+                            i / CHUNK_SIZE * SEND_COUNT] = tmp_buffer[i]; // Leave spaces for future chunks
         }
     }
 
@@ -194,13 +203,13 @@ int main(int argc, char** argv) {
     delta = end_time - start_time;
 
     // TODO: Write test code that verifies gather is correct
-    if (rank == 0) {
-         printf("Gathered data at the root process:\n");
-         for (int i = 0; i < size * SEND_COUNT; ++i) {
-             printf("%d ", recv_buffer[i]);
-         }
-         printf("\n");
-    }
+    // if (rank == 0) {
+    //      printf("Gathered data at the root process:\n");
+    //      for (int i = 0; i < size * SEND_COUNT; ++i) {
+    //          printf("%d ", recv_buffer[i]);
+    //      }
+    //      printf("\n");
+    // }
 
     // free and print the time taken by the communication
     free(recv_buffer);

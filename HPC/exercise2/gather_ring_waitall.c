@@ -71,9 +71,6 @@ int main(int argc, char** argv) {
     MPI_Barrier(MPI_COMM_WORLD);
     start_time = MPI_Wtime();
 
-    // We can use non blocking send and blocking receive.
-    // each time we receive we can send to previous process.
-    // root just waits for all communications
     // rank j receives 1 message and does 1 send
     // rank 0 receives 1 message and does 0 send
     curr_buffer += SEND_COUNT;

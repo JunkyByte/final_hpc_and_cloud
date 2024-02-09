@@ -1,5 +1,6 @@
 # Final Project HPC - Exercise 2A
-# Implementing Gather  using p2p communication.
+# Gather operation using p2p communication.
+
 - Adriano Donninelli adonnine@sissa.it
 
 ## Introduction
@@ -49,35 +50,8 @@ else {
 }
 ```
 
-### naive_gather_improved.c
-In `naive_gather` root receives the requests in order. In this version I use non-blocking receive operations instead.
-
-The code can be summarized as:
-```c
-int* recv_buffer = NULL;
-if (rank == 0) 
-    recv_buffer = (int*)malloc(size * SEND_COUNT * sizeof(int));
-int send_data[SEND_COUNT];
-// [...]
-
-int* curr_buffer = recv_buffer;
-MPI_Request reqs[size];
-
-if (rank != 0) // blocking send
-    MPI_Send(send_data, SEND_COUNT, MPI_INT, 0, rank, MPI_COMM_WORLD);
-else {
-    for (int i=1; i<size; i++){  // non blocking receive
-        curr_buffer += SEND_COUNT;  // Move buffer pointer along
-        MPI_Irecv(curr_buffer, SEND_COUNT, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &reqs[i]);
-    }
-
-    // Wait all requests to be done
-    for (int i=1; i<size; i++)  // Here MPI_Waitall could be used instead.
-        MPI_Wait(&reqs[i], MPI_STATUS_IGNORE);
-}
-```
-
-I imagined that using non blocking receive would improve results but it didn't prove very effective.
+In this implementation the root process receives the requests in order, a simple variant (`naive_gather_improved.c`) in which I non-blocking receive operations are used is also provided.
+I imagined that using non blocking receive would improve results but it proved only marginally effective.
 
 ### gather_ring.c
 
@@ -182,7 +156,7 @@ MPI_Request req_receive[num_children];
 if (left_child < size){
     curr_buffer += SEND_COUNT;
     MPI_Irecv(curr_buffer, RECEIVE_COUNT_LEFT, MPI_INT, left_child_rank,
-              0, MPI_COMM_WORLD,&req_receive[0]);
+              0, MPI_COMM_WORLD, &req_receive[0]);
     if (right_child < size){
         curr_buffer += RECEIVE_COUNT_LEFT;
         MPI_Irecv(curr_buffer, RECEIVE_COUNT_RIGHT, MPI_INT, right_child_rank,
@@ -199,3 +173,17 @@ if (rank != 0){
     MPI_Send(recv_buffer, TOTAL_COUNT, MPI_INT, parent_rank, 0, MPI_COMM_WORLD);
 }
 ```
+
+I also provide a version of the binary tree (`gather_binary_tree_chunks.c`) with message splitting into chunks of fixed size. The code is quite similar but involves some more complex buffer manipulations. The binary tree is executed multiple times sharing different parts of the message.
+
+## Results
+
+TODO
+
+
+
+
+
+
+
+
