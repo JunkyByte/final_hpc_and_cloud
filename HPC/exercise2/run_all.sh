@@ -4,14 +4,13 @@
 #SBATCH --ntasks-per-node=128
 #SBATCH --cpus-per-task=1
 #SBATCH --nodes=2
-#sBATCH --mem=450gb
+#SBATCH --mem=450gb
 #SBATCH --time=2:00:00
 #SBATCH --exclusive
 #SBATCH -A dssc
 #SBATCH --output=./output.log  # Redirect stdout to a file
 
-cd /u/dssc/adonninelli/final/HPC/exercise2
-# rm -rf ./results/*.csv
+rm -rf ./results/*.csv
 
 if [ "$#" -ne 1 ]; then
     echo "Usage: $0 <experiment>"

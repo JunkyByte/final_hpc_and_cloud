@@ -1,4 +1,8 @@
-# Exercise 1 - HPC
+# Exercise 1 - HPC Final Assignment
+# Performance Evaluation of OpenMPI Collective Operations
+
+Please refer to `exercise1.md` for the text of the exercise.
+`report.pdf` contains the final report.
 
 In order to obtain the reported timings `job.sh` can be used.
 The work is split into different chunks as the 2 hour limit on orfeo were not long enough to perform all the benchmarks.

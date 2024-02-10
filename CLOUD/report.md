@@ -1,12 +1,12 @@
 # Cloud-Based File Storage System
-# Project Report - Cloud
+# Project Report - Cloud basic
 - Adriano Donninelli adonnine@sissa.it
 
 ## Introduction
 
 This project aims to address the need for a cloud-based file storage system that enables users to seamlessly upload, download, and delete files while ensuring the privacy of individual storage spaces. In order to not reinvent the wheel and to pursue efficiency, Nextcloud has been selected for its robust features and ease of deployment using Docker containers.
 
-![nextcloud_system_design](https://i.imgur.com/68Ic2Iv.png)
+![nextcloud_system_design](./figures/nextcloud_system_design.png)
 
 ## Nextcloud and its features
 
@@ -97,10 +97,10 @@ sh delete_data_test_users.sh
 I attach two charts of the results, where the run is performed on my laptop which is M2 Macbook Air, note that encryption is enabled during these tests. I spawn respectively 10 and 20 concurrent users. As we can see my laptop is able to handle 10 users without any failure but starts to struggle and fail requests when we increase to 20.
 
 > 10 user:
-![locust_10user](https://i.imgur.com/Xkydm3N.png)
+![locust_10user](./figures/locust_10user.png)
 
 > 20 user
-![locust_20user](https://i.imgur.com/XKkKB7X.png)
+![locust_20user](./figures/locust_20user.png)
 
 Analyzing the locust report with 20 concurrent users reveals server issues, particularly in serving requests. Simple PUT requests experience delays of up to 5 seconds. To pinpoint the problem, additional tests are needed to determine if it's related to CPU or IO constraints.
 

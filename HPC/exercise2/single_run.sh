@@ -29,7 +29,7 @@ done
 host_spec="${host_spec:1}"
 
 # Run the executable using mpirun
-timing=$(mpirun --map-by core --mca coll_tuned_use_dynamic_rules true --mca coll_tuned_gather_algorithm 2 -H "$host_spec" "./build/out_${script%.c}")
+timing=$(mpirun --map-by core -H "$host_spec" "./build/out_${script%.c}")
 
 # Print the timing information with alignment
 printf "Processes: %-3d | Data Size: %-5d | Timing: %s\n" "$num_processes" "$data_size" "$timing"

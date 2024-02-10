@@ -175,10 +175,9 @@ int main(int argc, char** argv) {
         // while leaf nodes are always free to send
 
         // Everybody does a send but root!
-        if (rank != 0){
-            // Does a single send! It can be blocking because once it is done the work is finished.
+        // Does a single send! It can be blocking because once it is done the work is finished.
+        if (rank != 0)
             MPI_Send(recv_buffer, TOTAL_COUNT, MPI_INT, parent_rank, 0, MPI_COMM_WORLD);
-        }
 
         end_time = MPI_Wtime();
         delta += end_time - start_time;

@@ -1,15 +1,20 @@
 # Final Project HPC - Exercise 2A
+
 # Gather operation using p2p communication.
 
-- Adriano Donninelli adonnine@sissa.it
+- Adriano Donninelli - UniTS - adonnine@sissa.it
 
-## Introduction
+
+
+# Introduction
 
 I have chosen to implement a custom version of the Gather collective operation using point-to-point (p2p) communication in the context of MPI (Message Passing Interface). The gather operation involves the root process collecting data from all other processes. For semplicity I aim to share an array of integers of fixed size from all processes to the root process. Extending the implementations I provide to support tags, custom group communicators and arbitrary data types its quite trivial as p2p communication support all these features but was left out for simplicity as we pose more attention on the timings of the different solutions.
 
 I will compare my custom gather operations with the different algorithms of the MPI_Gather implementation provided by OpenMPI. For simplicity, in some of the scripts I will assume that root process is rank 0.
 
-## Gather operation
+
+
+# Gather operation
 
 Before proceding let's define how the Gather collective operation works:
 
@@ -17,20 +22,29 @@ Suppose that there are `N` processes and that each has a fixed amount of data wi
 Performing a gather operations means that one particular process, denoted as root receives from all the other processes their chunk of data. At the end of a gather operation the root process will hold a buffer of data of size `N * K`.
 The gathered data must be ordered as the ranks assigned to the processes.
 
-![gather_fig](https://i.imgur.com/efTku4k.png)
+<img src="./figures/ex_gather.png" alt="gather_fig" style="zoom:67%;" />
 
-## Experimental Setup
+
+
+# Experimental Setup
 
 In order to obtain more consistent timings I perform multiple runs of all the algorithms therefore getting an average run time. I also perform a warmup of the communication channels passing dummy data between the processes. For each solution I only time the actual gather operation and not the variable setup required by different algorithms. To perform all the timings I write a set of bash scripts which allow to perform weak and strong scaling measurements of all the implementations. The tests are performed on ORFEO cluster using the epyc partition. A varying amount of nodes and data sizes is used to assess both weak and strong scaling features of the different implementations, more details in the **Results** section.
 
-## Implementations
+
+
+# Implementations
+
 Let's discuss the different implementations I propose:
 Suppose in the following that `N` is the total number of processes.
 
-### naive_gather.c
+
+
+## naive_gather.c
+
 The first implementation is called `naive_gather` and works by having all processes but root issue a blocking send to root. Root on the other hand issues `N` blocking receive. This is a simple linear approach with blocking communication.
 
 The code can be summarized as:
+
 ```c
 int* recv_buffer = NULL;
 if (rank == 0) 
@@ -50,19 +64,22 @@ else {
 }
 ```
 
-In this implementation the root process receives the requests in order, a simple variant (`naive_gather_improved.c`) in which I non-blocking receive operations are used is also provided.
+In this implementation the root process receives the requests in order, a simple variant (`naive_gather_improved.c`) in which I use non-blocking receive operations is also provided.
 I imagined that using non blocking receive would improve results but it proved only marginally effective.
 
-### gather_ring.c
+
+
+## gather_ring.c
 
 I experimented with a different communication pattern between the processes. Assuming root is rank `0`, I create a ring communication in which each process sends current data to left process until root receives all the data. (The name gather_pipeline would have been a more sensible choice). This pattern is not very efficient but is a good exercise.
 
-![ring_fig](https://i.imgur.com/ENxdRtM.png)
+![ring_fig](./figures/ring_comm.png)
 
 This way rank `j` receives `N - j - 1` messages and does `N - j` send.
 Rank `0` receives `N - 1` messages and does `0` send.
 
 The code can be summarized as:
+
 ```c
 int* recv_buffer = NULL;
 if (rank == 0) {
@@ -91,9 +108,12 @@ if (rank != 0){
 }
 ```
 
-I thought of using buffered non blocking send in order to reuse the buffer and issue a recv before the previous send finishes but while it worked for me locally I received an error on ORFEO. It might be that buffered send are disabled or I am making some basic mistake. `[epyc003] pml_ucx.c:743  Error: bsend: failed to allocate buffer`.
+I thought of using buffered non blocking send in order to reuse the buffer and issue a recv before the previous send finishes but while it worked for me locally I received an error on ORFEO.It might be that buffered send are disabled or that I am making some trivial mistake.
+
+ `[epyc003] pml_ucx.c:743  Error: bsend: failed to allocate buffer`.
 
 The idea was to use the following loop for `rank != 0`:
+
 ```c
 MPI_Request req;
 MPI_Isend(send_data, SEND_COUNT, MPI_INT, rank - 1, rank, MPI_COMM_WORLD, &req);
@@ -104,13 +124,17 @@ for (int i=0; i<size-rank-1; i++){
 }
 MPI_Wait(&req, MPI_STATUS_IGNORE);
 ```
+
 I would expect a better performance with this buffered approach as the next receive operation can be issued before the previous send has finished. In this case a buffered send is required because otherwise the `recv_buffer` could be overwritten before it is safe to do so, causing undefined behaviour.
 
-### gather_ring_waitall.c
+
+
+## gather_ring_waitall.c
 
 I propose an even more inefficient variant of the previous approach where the `j-th` process accumulates all the data coming from its right neighbors before sending it to its left.
 
 While inefficient the implementation is quite elegant, with a single send and receive for all but first and last ranks.
+
 ```c
 if (rank != size - 1)
     MPI_Recv(curr_buffer, (size - rank - 1) * SEND_COUNT, MPI_INT,
@@ -120,13 +144,17 @@ if (rank != 0)
     MPI_Send(recv_buffer, (size - rank) * SEND_COUNT, MPI_INT,
              rank - 1, rank, MPI_COMM_WORLD);
 ```
+
 This approach won't be included in the results as it infeasible.
 
-### gather_binary_tree.c
+
+
+## gather_binary_tree.c
 
 The last implementation pattern I propose is based on the usage of a binary tree pattern. The set of processes is conceptualized as a binary tree, where each process serves as a node. Beginning with the leaf nodes, each process shares the data with its parent, and this process continues until the root node is reached. As data moves up the tree, each node accumulates data from its children until the root receives it.
 
-![binary_comm](https://i.imgur.com/ylSXiRj.png)
+<img src="./figures/binary_comm.png" alt="binary_comm" style="zoom:67%;" />
+
 > The communications with the same color do not depend on each other and are issued in parallel.
 
 This implementation required more effort because the binary tree pattern is more complex but also because the ranks given by openMPI can't be used directly as tree ranks otherwise the data collected by root will not be ordered.
@@ -134,6 +162,7 @@ This implementation required more effort because the binary tree pattern is more
 By observing the way I accumulate data in intermediate buffers along the tree and how the processes are ordered I noticed that I needed to traverse the tree following a preorder traversal pattern to have the data naturally ordered at root. By knowing this I rearranged the ranks of the tree starting from the mpi ranks to gather data correctly.
 
 I write here only a part of the code as it is quite long. A few variables are computed regarding the tree structure:
+
 ```c
 // [...] Computed variables regarding tree structure
 // Calculate amount of total data the node holds and the amount it should receive
@@ -174,9 +203,11 @@ if (rank != 0){
 }
 ```
 
-I also provide a version of the binary tree (`gather_binary_tree_chunks.c`) with message splitting into chunks of fixed size. The code is quite similar but involves some more complex buffer manipulations. The binary tree is executed multiple times sharing different parts of the message.
+I also provide a version of the binary tree (`gather_binary_tree_chunks.c`) with message splitting into chunks of fixed size. The code is quite similar but involves some more complex buffer manipulations. The binary tree is executed multiple times with the sharing of different parts of the message. This version did not perform well and the results are not included.
 
-## Results
+
+
+# Results
 
 The experiments are all run using 2 EPYC nodes and varying amount of processes, equally distributed among the nodes. I perform all experiments using map-by `core` policy. I would expect different results using a policy such as `node` but I focus mostly on other aspects of the performance assessment and did not perform experiments on this regard.
 
@@ -194,29 +225,55 @@ On the other hand strong scaling allows to inspect how efficiently one of the ga
 
 Both these tests fix one parameter of computation. I varied this fixed values, trying to uncover different aspects of the scaling.
 
-### Weak scaling
+
+
+## Weak scaling
 
 First we plot the results of weak scaling for different fixed data sizes.
 
 For small data size per process of `1kb` we get interesting results.
 
-![weak1kb](https://i.imgur.com/XdFiutY.png)
+![weak1kb](./figures/weak1kb.png)
+As we can see the binary tree based implementation scales very well with such small data sizes, beaten only by the mpi binomial algorithm. I would expect an even greater gain if we increase the number of cores further. The linear approaches are note very competitive, with timings that get closer to the ring one. We can also observe that `naive_gather` performs worse than the `mpi_gather_linear` OpenMPI implementation even though they should be similar approaches.
 
-As we can see the binary tree based implementation scales very well with such small data sizes, I would expect an even greater gain if we increase the number of cores further. The linear approaches are still competitive while the ring one already falls short. We can also observe that `naive_gather` performs worse than the `mpi_gather_linear` OpenMPI implementation even though they should be similar approaches.
-
-The results progressively change as we increase the data size. Using `10kb` per process the gain of the binary tree is reduced and the linear approaches look now more competitive:
-
-![weak10kb](https://i.imgur.com/5S34BPH.png)
-
+The results progressively change as we increase the data size.
+Using `10kb` per process the gain of the binary tree is reduced and the linear approaches look now more competitive:
+![weak10kb](./figures/weak10kb.png)
 The difference between my `naive_gather` and the original implementation is now negligible.
-Increaseing further the data sizes only confirms the current trends.
 
-![weak1mb](https://i.imgur.com/4mf2Xnx.png)
+Increasing further the data sizes to `1mb` only confirms the current trends:
+![weak1mb](./figures/weak1mb.png)
+I tried with even larger sizes and got similar results. I conclude that linear approaches become more and more competitive as data size increases. On the other hand when the processes share a modest amount of data and the experiments are more latency bounded, approaches based on trees perform well as they divide the problem in multiple parallel layers of communication.
 
-With larger sizes we get exactly the same results. I conclude that linear approaches become more and more competitive as data size increases. On the other hand when the processes share a modest amount of data and the experiments are more latency bounded approaches based on trees perform well as they divide the problem in multiple parallel layers of communication.
 
-### Strong scaling
+
+## Strong scaling
 
 Let's see the results of strong scaling for varying amount of processes.
+The strong scaling tests increase data size up to the limit on per process memory that was available (note that the upper bound depends on the fixed amount of processes used and varies between the different plots).
 
-I run the strong scaling tests also with very large amounts of data per process.
+Let's start with `16` processes:
+![strong16](./figures/strong16.png)
+As we can see the `naive_gather` implementations are quite efficient with such small amount of processes and scale very well with the data size while the ring based approach does not, as we already observed.
+
+Unexpectedly the `binary_tree` approach performs better than the mpi binomial. I think that this might be related to message splitting. Inspecting the timings of the two algorithms for small data sizes we can see a peculiar behaviour after the `1mb` threshold that might confirm such hypothesis.
+
+![obs_scaling](./figures/observation_strong.png)
+
+Increasing the number of processes to `64` the tree based approaches are still competitive, with a smaller difference between the binary tree and the binomial tree algorithms:
+![strong64](./figures/strong64.png)
+
+Also with `256` total processes we can see the behaviour is similar to the previous one:
+![strong256](./figures/strong256.png)
+
+
+
+# Conclusion
+
+In this project I implemented and compared custom versions of the Gather operation using point-to-point communication in MPI, including OpenMPI builtin implementations in the evaluation. I started by introducing the Gather operation, where a root process collects data from others.
+
+The implementations aimed to share an array of integers among processes. While they could support additional features, I kept it basic to focus on timing evaluations.
+
+Implemented approaches included a linear one (`naive_gather`), a ring-based method (`gather_ring`), and a tree-based approach (`gather_binary_tree`). Some variants of these methods were also discusses. Results showed that linear methods performed better with larger data sizes, while tree-based methods were efficient with modest data sharing.
+
+In conclusion, the project explored possible Gather operation implementations in MPI, providing insights into the strengths and weaknesses of the different approaches in various scenarios.

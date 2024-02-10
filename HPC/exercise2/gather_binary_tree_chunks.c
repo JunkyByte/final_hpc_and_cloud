@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
 
     // Chunk size
-    int START_CHUNK_SIZE = min(SEND_COUNT, 250);  // 1 kb ?
+    int START_CHUNK_SIZE = min(SEND_COUNT, 250);  // 1 kb
     int CHUNK_SIZE = START_CHUNK_SIZE;
 
     int rank, size;
@@ -143,10 +143,9 @@ int main(int argc, char** argv) {
     // We want to end up with everything to root node
     // which we assume to be ID 0
 
-    size_t send_pos = 0;
-
     for (int k=0; k<REPETITIONS;k++){
         int* curr_buffer = recv_buffer;
+        size_t send_pos = 0;
         MPI_Request req_receive[num_children];
         CHUNK_SIZE = START_CHUNK_SIZE;
         TOTAL_COUNT = (1 + total_descendants) * CHUNK_SIZE;

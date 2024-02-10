@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node=128
 #SBATCH --cpus-per-task=1
 #SBATCH --nodes=2
-#sBATCH --mem=450gb
+#SBATCH --mem=450gb
 #SBATCH --time=2:00:00
 #SBATCH --exclusive
 #SBATCH -A dssc
@@ -16,7 +16,6 @@ start_time=$(date +%s)
 
 module purge
 module load openMPI/4.1.5/gnu
-cd /u/dssc/adonninelli/final/HPC/exercise2
 
 if [ "$#" -ne 2 ]; then
     echo "Usage: $0 <script> <experiment>"
