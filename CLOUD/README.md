@@ -1,7 +1,7 @@
 # Cloud Basic - Final Assignment
 # Cloud-Based File Storage System
 
-The `report.pdf` contains all the details for deployment. Please refer to it. 
+The `Donninelli_report.pdf` contains all the details for deployment. Please refer to it. 
 
 I paste the `deployment` section here.
 
