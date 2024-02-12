@@ -1,7 +1,0 @@
-{
-    "files.associations": {
-        "mpi.h": "c",
-        "limits": "c",
-        "const.h": "c"
-    }
-}
