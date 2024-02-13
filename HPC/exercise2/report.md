@@ -179,7 +179,7 @@ if (num_children) // We wait to receive data from children
     MPI_Waitall(num_children, req_receive, MPI_STATUS_IGNORE);
 
 // Everybody does a send but root! It can be blocking because once it is done the work is finished.
-if (rank != 0){
+if (rank != 0)
     MPI_Send(recv_buffer, TOTAL_COUNT, MPI_INT, parent_rank, 0, MPI_COMM_WORLD);
 ```
 
@@ -232,7 +232,7 @@ Unexpectedly the `binary_tree` approach performs better than the mpi binomial. I
 Increasing the number of processes to `64` the tree based approaches are still competitive, with a smaller difference between the binary tree and the binomial tree algorithms:
 				<img src="./figures/strong64.png" alt="strong64" style="zoom:50%;" />
 
-Also with `256` total processes we can see the behaviour is similar to the previous one:
+With `256` total processes the behaviour does not change:
 				<img src="./figures/strong256.png" alt="strong256" style="zoom:50%;" />
 
 ## Conclusion
