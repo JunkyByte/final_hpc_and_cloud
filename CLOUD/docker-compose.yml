@@ -24,6 +24,43 @@ services:
     volumes:
       - ./locust-tasks:/locust-tasks
       - ./test-data:/test-data  # Volume mount for the folder containing file.txt
+    
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+
+  nextcloud-exporter:
+    image: ghcr.io/xperimental/nextcloud-exporter:latest
+    container_name: nextcloud-exporter
+    restart: always
+    environment:
+      - NEXTCLOUD_SERVER=http://nextcloud  # Update with your Nextcloud URL and port
+      - NEXTCLOUD_USERNAME=admin
+      - NEXTCLOUD_PASSWORD=admin
+      - NEXTCLOUD_LISTEN_ADDRESS=:9205  # Adjust the port if needed
+    ports:
+      - "9205:9205"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin  # Set your desired Grafana admin password
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+    volumes:
+      - grafana_data:/var/lib/grafana
 
 volumes:
   nextcloud_data:
+  grafana_data:
+  prometheus:

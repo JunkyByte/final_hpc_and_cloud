@@ -40,7 +40,9 @@ In order to allow users to register by themselves, leveraging the webinterface, 
 
 Nextcloud comes with a set of secure defaults to address the security of the system. In order to implement secure file storage, if the user data is sensible, Nextcloud allows to enable file encryption on the server side. This will reduce the performance of the system but will prevent an intruder that gains access to the data to read it. When file encryption is enabled, all files can still be shared by a user using the Nextcloud interface but won't be sharable directly from the remote server. Note that enabling encryption also increases the amount of space required by each file.
 
-To enable encryption from the web interface simply login as admin, search for the Default Encryption module app and enable it. Then to enable file encryption: `Administration Settings -> Administration Security -> Server-side encryption`
+To enable encryption from the web interface simply login as admin, search for the Default Encryption module app and enable it. Then to enable file encryption:
+
+ `Administration Settings -> Administration Security -> Server-side encryption`
 
 More conveniently, using the command line (assuming the provided docker-compose deployment):
 ```bash
@@ -50,7 +52,7 @@ echo "yes" | docker exec -i --user www-data nextcloud /var/www/html/occ encrypti
 ```
 
 The system won't be secure unless our users have non trivial passwords. From the same configuration page we can harden the password policy by requiring numeric characters or symbols. We can also require the password to be changed every few days.
-To prevent unauthorized access and secure user authentication we can also enable 2 factor authentication for all user access.
+To prevent unauthorized access and secure user authentication we can also enable 2 factor authentication for user accesses.
 
 The clients and the server interact through HTTP protocol, enforcing HTTPS protocol is mandatory in production servers to prevent man in the middle attacks and data snooping.
 
@@ -70,7 +72,11 @@ By default Nextcloud stores files in the local file system, which is convenient 
 
 ### Monitoring
 
-In order to monitor the system performances it is convenient to integrate a monitoring system like Grafana backed up by Prometheus for the data collection. These systems are flexible and can be dockerized for easy setup, allowing to monitor the performances also of local disks and network operations.
+Next cloud provides some monitoring metrics inside its webui by default. These system metrics can be accessed by
+
+ `Administration Settings -> System`.
+
+In order to build a more customizable monitoring system it might be convenient to use a tool like Grafana, backed up by Prometheus for the data collection. These systems are flexible and can be dockerized for easy setup, allowing to monitor also local disks and network operations. I provide more details in the **deployment** section.
 
 
 
@@ -82,12 +88,30 @@ In order to test the performance of the system in terms of load and IO operation
 
 ## Deployment
 
-The deployment is done through the usage of docker and docker-compose. We leverage docker-compose in order to connect locust to our nextcloud instance. By simple changes to the `docker-compose.yml` it is possible to switch the Database backend and modify the configuration of the Netxcloud instance.
+The deployment is done through the usage of docker and docker-compose. We leverage docker-compose in order to connect locust / grafana and prometheus to our nextcloud instance. By simple changes to the `docker-compose.yml` it is possible to switch the Database backend and modify the configuration of Netxcloud.
 
-To simply run the docker containers, `cd` to the folder containing the `docker-compose.yml` file and run
+To run the docker containers, `cd` to the folder containing the `docker-compose.yml` file and run
 ```bash
 docker-compose up -d
 ```
+
+
+
+### Monitoring with Grafana
+
+In order to monitor the performance of our system I setup 3 additional containers, one for Grafana, a common monitoring tool, one for prometheus which works as a data source for Grafana and last an open source library which acts as a bridge between the Nextcloud instance and prometheus, called `nextcloud-exporter` (https://github.com/xperimental/nextcloud-exporter).
+
+The docker compose I provide contains a working setup required to connect these containers. Some customization (passwords used are the default) can be applied in order to secure the system.
+
+The only thing we need to setup manually is the Grafana data source and dashboard. In order to do so go to grafana web interface `http://localhost:3000/` and add a new data source for Prometheus.
+
+Set the Prometheus server url to `http://prometheus:9090` (the name of the docker container and the port exposed). Save and test if everything works correctly. Last step is to add a new dashboard. I provide a sample one, `dashboard_sample.json` which can be used as a starting point, simply click on `Create dashboard`, import the json file and select the data source previously created.
+
+The dashboard is now connected and various metrics are visibile. Other metrics are exported by prometheus and the view can be further customized.
+
+![grafana](./figures/grafana_sample.png)
+
+### Testing with locust
 
 As a security measure by default nextcloud will only authorize requests made from localhost. To make the requests from the locust container to be accepted by nextcloud we need to add it to the trusted_domains. This is only necessary in order to run load tests correctly.
 
@@ -206,7 +230,7 @@ Utilizing a cloud provider offers the advantage of scalability and flexibility. 
 
 Comparing the two solutions, on-premise deployment (Solution 1) may incur in higher upfront infrastructure costs, but operational costs might be lower. Cloud provider deployment (Solution 2) offers flexibility and scalability, but costs can accumulate based on usage. I would say that the most optimal solution depends on hardware availability and how variable the workloads are.
 
-In order to optimize the costs for Solution 2 especially if we assume that the data stored is not sensible or that the cloud service provides additional layers of security, one could disable server wise encryption, leading to smaller file sizes and better performances. This might also apply to Solution 1 in case we have limited amount of computing power or storage memory.
+In order to optimize the costs for Solution 2 especially if we assume that the data stored is not sensible or that the cloud service provides additional layers of security, one could disable server side encryption, leading to smaller file sizes and better performances. This might also apply to Solution 1 in case we have limited amount of computing power or storage memory.
 
 In addition to that if the deployment plan is long term the usage of Reserved instances which many cloud providers offer can reduce costs considerably.
 
