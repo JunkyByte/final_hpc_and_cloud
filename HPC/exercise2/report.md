@@ -19,7 +19,7 @@ I will compare my custom gather operations with the different algorithms of the 
 Before proceding let's define how the Gather collective operation works:
 
 Suppose that there are `N` processes and that each has a fixed amount of data with size `K`.
-Performing a gather operations means that one particular process, denoted as root receives from all the other processes their chunk of data. At the end of a gather operation the root process will hold a buffer of size `N * K`. The gathered data must be ordered as the processes ranks.
+Performing a gather operations means that one particular process, denoted as root receives from all the other processes their chunk of data. At the end of a gather operation the root process will hold a buffer of size `N * K`. The gathered data must be ordered as the processes ranks assigned by MPI.
 
 ​										<img src="./figures/ex_gather.png" alt="gather_fig" style="zoom:67%;" />
 
@@ -27,7 +27,9 @@ Performing a gather operations means that one particular process, denoted as roo
 
 ## Experimental Setup
 
-In order to obtain more consistent timings I perform multiple runs of all the algorithms, getting an average run time. I also perform a warmup of the communication channels passing dummy data between the processes. For each solution I only time the actual gather operation and not the variable setup required by different algorithms. To perform all the timings I write a set of bash scripts which allow to perform weak and strong scaling measurements. The tests are performed on ORFEO cluster using the epyc partition. A varying amount of nodes and data sizes is used to assess both weak and strong scaling features of the different implementations, more details in the **Results** section.
+In order to obtain more consistent timings I perform multiple runs of all the algorithms, getting an average run time. I also perform a warmup of the communication channels passing dummy data between the processes. For each solution I only time the actual gather operation and not the variable setup required by different algorithms. To perform all the timings I write a set of bash scripts which allow to perform weak and strong scaling measurements. The tests are performed on ORFEO cluster using EPYC nodes. A varying amount of cores and data sizes is used to assess both weak and strong scaling features of the different implementations, more details in the **Results** section.
+
+
 
 
 
@@ -44,7 +46,7 @@ The first implementation is called `naive_gather` and works by having all proces
 ```c
 int* recv_buffer = NULL;
 if (rank == 0) 
-    recv_buffer = (int*)malloc(size * SEND_COUNT * sizeof(int));
+    recv_buffer = (int*) malloc(size * SEND_COUNT * sizeof(int));
 int send_data[SEND_COUNT];
 // [...]
 
@@ -75,9 +77,9 @@ Rank `0` receives `N - 1` messages and does `0` send.
 ```c
 int* recv_buffer = NULL;
 if (rank == 0) {
-    recv_buffer = (int*)malloc(size * SEND_COUNT * sizeof(int));
+    recv_buffer = (int*) malloc(size * SEND_COUNT * sizeof(int));
 } else
-    recv_buffer = (int*)malloc(SEND_COUNT * sizeof(int));  // 1 message buffer
+    recv_buffer = (int*) malloc(SEND_COUNT * sizeof(int));  // 1 message buffer
 int send_data[SEND_COUNT];
 [...]
 
@@ -100,7 +102,9 @@ if (rank != 0){
 }
 ```
 
-I thought of using buffered non blocking send in order to reuse the buffer and issue a recv before the previous send finishes but while it worked for me locally I received an error on ORFEO. It might be that buffered send are disabled or that I am making some trivial mistake.  `[epyc003] pml_ucx.c:743  Error: bsend: failed to allocate buffer`. The idea was to use the following loop for `rank != 0`:
+I thought of using buffered non blocking send in order to reuse the buffer and issue a recv before the previous send finishes but while it worked for me locally I received an error on ORFEO. It might be that buffered send are disabled or that I am making some trivial mistake.  `pml_ucx.c:743  Error: bsend: failed to allocate buffer`.
+
+The idea was to use the following loop for `rank != 0`:
 
 ```c
 MPI_Request req;
@@ -137,11 +141,11 @@ if (rank != 0)
 
 The last implementation pattern I propose is based on the usage of a binary tree pattern. The set of processes is conceptualized as a binary tree, where each process serves as a node. Beginning with the leaf nodes, each process shares the data with its parent, and this process continues until the root node is reached. As data moves up the tree, each node accumulates data from its children until the root receives it.
 
-​				<img src="./figures/binary_comm.png" alt="binary_comm" style="zoom: 33%;" />
+​			<img src="./figures/binary_comm.png" alt="binary_comm" style="zoom: 38%;" />
 
 > The communications with the same color do not depend on each other and are issued in parallel.
 
-This implementation required more effort because the binary tree pattern is more complex but also because the ranks given by openMPI can't be used directly as tree ranks otherwise the data collected by root will not be ordered.
+This implementation required more effort because the binary tree pattern is more complex but also because the ranks given by OpenMPI can't be used directly as tree ranks otherwise the data collected by root will not be ordered.
 
 By observing the way I accumulate data in intermediate buffers along the tree and how the processes are ordered I noticed that I needed to traverse the tree following a preorder traversal pattern to have the data naturally ordered at root. By knowing this I rearranged the ranks of the tree starting from the mpi ranks to gather data correctly.
 
@@ -189,13 +193,15 @@ I also provide a version of the binary tree (`gather_binary_tree_chunks.c`) with
 
 ## Results
 
-The experiments are all run using 2 EPYC nodes and varying amount of processes, equally distributed among the nodes. I perform all experiments using map-by `core` policy. I would expect different results using a policy such as `node` but I focus mostly on other aspects of the performance assessment and did not perform tests on this regard.
+The experiments are all run using 2 EPYC nodes and varying amount of processes, equally distributed among the nodes. I perform all experiments using map-by `core` policy. I would expect different results using a policy such as `node` but I focused mostly on other aspects of the performance assessment and did not perform tests on this regard.
 
 I compare all timings with the `MPI_Gather` collective operation of OpenMPI. I plot the results of both the `linear` and `binomial` implementations. In order to evaluate the performances of the different algorithms I repeat the timings multiple times. The number of repetitions depend on the number of processes and data size, ranging from up to `10000` iterations for very small data sizes down to `10` for very large ones. Using small data sizes lead to latency bounded tests which are subject to large fluctuations between different runs, therefore using a larger number of repetitions is vital in order to obtain consistent timings.
 
 I perform two different tests, to address both weak and strong scaling. In weak scaling I vary the number of total processes with a fixed amount of data assigned to each one. In strong scaling the amount of data per process varies while the total amount of processes is fixed.
 
 Weak scaling in this scenario allows to inspect how efficiently one of the gather algorithms scales as the number of processes increases. It is important because algorithms such as binary tree, ring and linear have different communication patterns and are expected to scale differently. On the other hand strong scaling allows to inspect how efficiently one of the gather algorithms scale as the data that has to be shared changes. Since ORFEO has powerful communication infrastructure between nodes providing large bandwith for communications it is indeed interesting to inspect strong scaling and see if and how the different communications patterns implemented are able to efficiently utilize the bandwidth capacity.
+
+By inspecting these two types of scaling we are able to understand the performance of the different communication patterns and figure out which would be more appropriate depending on the situation.
 
 Both these tests fix one parameter of computation. I varied these fixed values, trying to uncover different aspects of the scaling.
 
