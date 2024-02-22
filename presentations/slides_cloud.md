@@ -5,7 +5,6 @@ theme: uncover
 math: mathjax
 ---
 <!-- size: 4:3 -->
-<!-- class: invert -->
 <style>
 {
   font-size: 35px
@@ -78,9 +77,7 @@ Grafana + Prometheus solution:
 
 ---
 
-## Testing
-
-Locust python package for load / IO testing:
+## Testing with Locust
 
 ![width:850px](../CLOUD/figures/locust_20user.png)
 

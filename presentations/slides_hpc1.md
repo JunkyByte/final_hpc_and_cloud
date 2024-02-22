@@ -5,7 +5,6 @@ theme: uncover
 math: mathjax
 ---
 <!-- size: 4:3 -->
-<!-- class: invert -->
 <style>
 {
   font-size: 35px
@@ -56,7 +55,6 @@ Comparing different algorithms:
 
 ---
 
-<!-- class: default -->
 ![width:750px](../HPC/exercise1/figs/bcast_3d.png)
 
 ---
@@ -64,8 +62,6 @@ Comparing different algorithms:
 ![width:750px](../HPC/exercise1/figs/scatter_3d.png)
 
 ---
-
-<!-- class: invert -->
 
 ## Experiments - 2
 
@@ -118,7 +114,6 @@ $$
 
 ---
 
-<!-- class: default -->
 ![width:850px](../HPC/exercise1/figs/bcast_plot.png)
 
 ---
